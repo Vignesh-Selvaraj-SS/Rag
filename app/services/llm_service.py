@@ -48,10 +48,6 @@ class LLMService:
             api_key=settings.GROQ_API_KEY
         ) if settings.GROQ_API_KEY else None
 
-    @property
-    def available(self) -> bool:
-        return self.client is not None
-
     def generate_answer(self, question: str, hits: list[dict]) -> dict:
 
         if self.client is None:
@@ -60,7 +56,18 @@ class LLMService:
                 "add your key from https://console.groq.com/keys"
             )
 
-        prompt = self._build_prompt(question, hits)
+        sources = "\n\n".join(
+            f"[S{number}] file: {hit['source']} | "
+            f"section: {hit['heading']} | {hit['page']}\n{hit['text']}"
+            for number, hit in enumerate(hits, start=1)
+        )
+
+        prompt = (
+            f"SOURCES\n{sources}\n\n"
+            f"QUESTION: {question}\n\n"
+            f"Answer using only the sources above, citing [S1]-style tags. "
+            f'If the answer is not there, reply exactly: "{REFUSAL_MESSAGE}"'
+        )
 
         response = self.client.chat.completions.create(
             model=settings.MODEL_NAME,
@@ -80,7 +87,20 @@ class LLMService:
 
         text = (response.choices[0].message.content or "").strip()
 
-        cited, invalid = self._parse_citations(text, len(hits))
+        # Verify citations against what was actually given - never trust
+        # a [S#] tag the model emits without checking it's in range.
+        cited = []
+        invalid = []
+
+        for tag in re.findall(r"\[S(\d+)\]", text):
+
+            number = int(tag)
+
+            if 1 <= number <= len(hits):
+                if number not in cited:
+                    cited.append(number)
+            else:
+                invalid.append(f"[S{tag}]")
 
         refused = (
             REFUSAL_MESSAGE.lower() in text.lower()
@@ -93,40 +113,3 @@ class LLMService:
             "invalid_citations": invalid,
             "refused": refused,
         }
-
-    @staticmethod
-    def _build_prompt(question: str, hits: list[dict]) -> str:
-
-        sources = "\n\n".join(
-            f"[S{number}] file: {hit['source']} | "
-            f"section: {hit['heading']} | {hit['page']}\n{hit['text']}"
-            for number, hit in enumerate(hits, start=1)
-        )
-
-        return (
-            f"SOURCES\n{sources}\n\n"
-            f"QUESTION: {question}\n\n"
-            f"Answer using only the sources above, citing [S1]-style tags. "
-            f'If the answer is not there, reply exactly: "{REFUSAL_MESSAGE}"'
-        )
-
-    @staticmethod
-    def _parse_citations(
-        text: str,
-        n_sources: int
-    ) -> tuple[list[int], list[str]]:
-
-        cited = []
-        invalid = []
-
-        for tag in re.findall(r"\[S(\d+)\]", text):
-
-            number = int(tag)
-
-            if 1 <= number <= n_sources:
-                if number not in cited:
-                    cited.append(number)
-            else:
-                invalid.append(f"[S{tag}]")
-
-        return cited, invalid

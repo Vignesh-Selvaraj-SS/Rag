@@ -1,21 +1,16 @@
 from app.core.config import settings
 
 # Embedding models are trained asymmetrically: questions and passages get
-# different instruction prefixes, and each family uses its own. Using the
-# wrong one costs accuracy silently, so they live beside the model names.
+# different instruction prefixes. Using the wrong one costs accuracy
+# silently, so it lives beside the model name. Only the model actually
+# configured in EMBEDDING_MODEL is listed - switching models requires
+# adding its correct prefix here too, on purpose (see README.md's model
+# comparison for the values other candidates used).
 PREFIXES = {
     # model: (question prefix, passage prefix)
     "BAAI/bge-small-en-v1.5": (
         "Represent this sentence for searching relevant passages: ", ""
     ),
-    "BAAI/bge-base-en-v1.5": (
-        "Represent this sentence for searching relevant passages: ", ""
-    ),
-    "BAAI/bge-large-en-v1.5": (
-        "Represent this sentence for searching relevant passages: ", ""
-    ),
-    "intfloat/multilingual-e5-large": ("query: ", "passage: "),
-    "sentence-transformers/all-MiniLM-L6-v2": ("", ""),
 }
 
 _models: dict = {}
@@ -32,14 +27,6 @@ class EmbeddingService:
     def __init__(self, model_name: str | None = None):
 
         self.model_name = model_name or settings.EMBEDDING_MODEL
-
-    @property
-    def query_prefix(self) -> str:
-        return PREFIXES.get(self.model_name, ("", ""))[0]
-
-    @property
-    def passage_prefix(self) -> str:
-        return PREFIXES.get(self.model_name, ("", ""))[1]
 
     def load(self):
         """
@@ -75,7 +62,7 @@ class EmbeddingService:
         if not texts:
             return []
 
-        prefix = self.passage_prefix
+        prefix = PREFIXES.get(self.model_name, ("", ""))[1]
 
         prepared = [prefix + text for text in texts] if prefix else texts
 
@@ -86,6 +73,8 @@ class EmbeddingService:
 
     def generate_query_embedding(self, text: str) -> list[float]:
 
+        prefix = PREFIXES.get(self.model_name, ("", ""))[0]
+
         return next(
-            iter(self.load().embed([self.query_prefix + text]))
+            iter(self.load().embed([prefix + text]))
         ).tolist()

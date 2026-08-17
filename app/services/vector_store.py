@@ -45,18 +45,17 @@ class VectorStore:
 
         self.client = client or QdrantClient(path=settings.QDRANT_PATH)
 
-    @staticmethod
-    def open_client(path: str) -> QdrantClient:
+    def rebuild_index(self, chunks: list[dict], batch_size: int = 128) -> int:
         """
-        A client for a scratch index, used by the comparison scripts.
+        Wipe the collection and store these chunks from scratch, so
+        re-ingesting never leaves stale chunks behind from documents
+        that were removed from data/.
         """
 
-        return QdrantClient(path=path)
-
-    def ensure_collection(self):
+        from app.services.chunk_service import embed_text
 
         if self.client.collection_exists(self.collection_name):
-            return
+            self.client.delete_collection(self.collection_name)
 
         self.client.create_collection(
             collection_name=self.collection_name,
@@ -69,26 +68,6 @@ class VectorStore:
                 ef_construct=HNSW_EF_CONSTRUCT,
             ),
         )
-
-    def clear_collection(self):
-        """
-        Delete the existing collection so re-ingesting never leaves
-        stale chunks behind.
-        """
-
-        if self.client.collection_exists(self.collection_name):
-            self.client.delete_collection(self.collection_name)
-
-        self.ensure_collection()
-
-    def add_documents(self, chunks: list[dict], batch_size: int = 128) -> int:
-        """
-        Store chunks and their embeddings in Qdrant.
-        """
-
-        from app.services.chunk_service import embed_text
-
-        self.ensure_collection()
 
         for start in range(0, len(chunks), batch_size):
 

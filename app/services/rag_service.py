@@ -1,9 +1,8 @@
 from app.core.config import DATA_DIR, settings
-from app.services.chunk_service import ChunkService
-from app.services.document_loader import DocumentLoader
+from app.services.chunk_service import create_chunks_for_all
+from app.services.document_loader import load_directory
 from app.services.llm_service import LLMService, REFUSAL_MESSAGE
 from app.services.retrieval_service import RetrievalService
-from app.services.vector_store import VectorStore
 
 
 class RAGService:
@@ -13,8 +12,6 @@ class RAGService:
 
     def __init__(self):
 
-        self.loader = DocumentLoader()
-        self.chunk_service = ChunkService()
         self.retriever = RetrievalService()
         self.llm = LLMService()
 
@@ -90,18 +87,16 @@ class RAGService:
         Rebuild the index from everything in the data folder.
         """
 
-        documents = self.loader.load_directory(DATA_DIR)
+        documents = load_directory(DATA_DIR)
 
         if not documents:
             raise FileNotFoundError(
                 f"No .md, .txt or .pdf files found in {DATA_DIR}"
             )
 
-        chunks = self.chunk_service.create_chunks_for_all(documents)
+        chunks = create_chunks_for_all(documents)
 
-        self.retriever.vector_store.clear_collection()
-
-        self.retriever.vector_store.add_documents(chunks)
+        self.retriever.vector_store.rebuild_index(chunks)
 
         return {
             "documents": len(documents),

@@ -49,7 +49,24 @@ class RetrievalService:
             source=source,
         )
 
-        hits = [self._to_hit(result) for result in results]
+        hits = []
+
+        for result in results:
+
+            page_start = result.get("page_start", 1)
+            page_end = result.get("page_end", page_start)
+
+            hits.append(
+                {
+                    "text": result.get("text", ""),
+                    "source": result.get("source", "unknown"),
+                    "heading": result.get("heading", ""),
+                    "page_start": page_start,
+                    "page_end": page_end,
+                    "page": page_label(page_start, page_end),
+                    "score": result["score"],
+                }
+            )
 
         best_score = hits[0]["score"] if hits else 0.0
 
@@ -59,20 +76,4 @@ class RetrievalService:
             "best_score": best_score,
             "passes_gate": bool(hits) and best_score >= min_score,
             "min_score": min_score,
-        }
-
-    @staticmethod
-    def _to_hit(result: dict) -> dict:
-
-        page_start = result.get("page_start", 1)
-        page_end = result.get("page_end", page_start)
-
-        return {
-            "text": result.get("text", ""),
-            "source": result.get("source", "unknown"),
-            "heading": result.get("heading", ""),
-            "page_start": page_start,
-            "page_end": page_end,
-            "page": page_label(page_start, page_end),
-            "score": result["score"],
         }
