@@ -2,7 +2,10 @@
 Build the search index from the documents in data/.
 
     python ingest.py
+    python ingest.py --strategy fixed_size
 """
+
+import argparse
 
 from app.core.config import settings
 from app.services.shared import rag_service
@@ -10,9 +13,17 @@ from app.services.shared import rag_service
 
 def main() -> int:
 
-    print(f"Embedding with {settings.EMBEDDING_MODEL} ...")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--strategy",
+        choices=["heading", "fixed_size"],
+        default="heading",
+    )
+    args = parser.parse_args()
 
-    result = rag_service.ingest()
+    print(f"Embedding with {settings.EMBEDDING_MODEL} (strategy: {args.strategy}) ...")
+
+    result = rag_service.ingest(strategy=args.strategy)
 
     print(f"\n{'document':<48}{'pages':>7}{'words':>8}{'chunks':>8}")
     print("-" * 71)

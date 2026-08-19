@@ -6,7 +6,9 @@ class ChatRequest(BaseModel):
 
 
 class Source(BaseModel):
-    page: int
+    source: str
+    heading: str
+    page: str
 
 
 class ChatResponse(BaseModel):

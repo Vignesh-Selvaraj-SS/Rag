@@ -1,4 +1,10 @@
+from typing import Literal
+
 from pydantic import BaseModel
+
+
+class IngestRequest(BaseModel):
+    strategy: Literal["heading", "fixed_size"] = "heading"
 
 
 class DocumentStat(BaseModel):
@@ -9,6 +15,7 @@ class DocumentStat(BaseModel):
 
 
 class IngestResponse(BaseModel):
+    strategy: str
     documents: int
     words: int
     chunks: int

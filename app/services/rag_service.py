@@ -1,5 +1,5 @@
 from app.core.config import DATA_DIR, settings
-from app.services.chunk_service import create_chunks_for_all
+from app.services.chunk_service import CHUNK_STRATEGIES
 from app.services.document_loader import load_directory
 from app.services.llm_service import LLMService, REFUSAL_MESSAGE
 from app.services.retrieval_service import RetrievalService
@@ -82,10 +82,17 @@ class RAGService:
             source=source,
         )
 
-    def ingest(self) -> dict:
+    def ingest(self, strategy: str = "heading") -> dict:
         """
-        Rebuild the index from everything in the data folder.
+        Rebuild the index from everything in the data folder, using
+        the named chunking strategy (see CHUNK_STRATEGIES).
         """
+
+        if strategy not in CHUNK_STRATEGIES:
+            raise ValueError(
+                f"Unknown chunking strategy '{strategy}'. "
+                f"Choose from: {', '.join(CHUNK_STRATEGIES)}"
+            )
 
         documents = load_directory(DATA_DIR)
 
@@ -94,11 +101,12 @@ class RAGService:
                 f"No .md, .txt or .pdf files found in {DATA_DIR}"
             )
 
-        chunks = create_chunks_for_all(documents)
+        chunks = CHUNK_STRATEGIES[strategy](documents)
 
         self.retriever.vector_store.rebuild_index(chunks)
 
         return {
+            "strategy": strategy,
             "documents": len(documents),
             "words": sum(document["word_count"] for document in documents),
             "chunks": len(chunks),

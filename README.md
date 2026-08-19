@@ -101,7 +101,7 @@ python ask.py "..." --search-only           # no key
 `POST /chat/` returns a deliberately thin shape:
 
 ```json
-{"answer": "...", "sources": [{"page": 3}]}
+{"answer": "...", "sources": [{"source": "policy-base-HO3-2026.md", "heading": "...", "page": "p.3"}]}
 ```
 
 `sources` is only what the answer **actually cited** — not everything

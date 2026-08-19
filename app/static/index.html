@@ -95,6 +95,19 @@
     opacity: 0.5;
     cursor: default;
   }
+  select {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: var(--card);
+    color: var(--text);
+  }
+  select:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
   .status {
     font-size: 0.85rem;
     color: var(--muted);
@@ -148,6 +161,10 @@
     <textarea id="question" placeholder="e.g. What deductible applies to a water backup claim?"></textarea>
     <div class="row">
       <button class="primary" id="ask">Ask</button>
+      <select id="strategy" title="Chunking strategy used when rebuilding the index">
+        <option value="heading">Chunk by heading</option>
+        <option value="fixed_size">Chunk by fixed size</option>
+      </select>
       <button class="secondary" id="ingest" title="Rebuild the index from data/">Rebuild index</button>
       <span class="status" id="status"></span>
     </div>
@@ -164,6 +181,7 @@
   const questionEl = document.getElementById("question");
   const askBtn = document.getElementById("ask");
   const ingestBtn = document.getElementById("ingest");
+  const strategyEl = document.getElementById("strategy");
   const statusEl = document.getElementById("status");
   const resultEl = document.getElementById("result");
   const answerEl = document.getElementById("answerText");
@@ -193,8 +211,15 @@
   function setBusy(busy, message) {
     askBtn.disabled = busy;
     ingestBtn.disabled = busy;
+    strategyEl.disabled = busy;
     statusEl.textContent = message || "";
     statusEl.classList.remove("error");
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   function showError(message) {
@@ -231,7 +256,9 @@
       answerEl.textContent = data.answer;
 
       sourcesEl.innerHTML = data.sources.length
-        ? "Sources: " + data.sources.map(s => `<span>p.${s.page}</span>`).join(", ")
+        ? "Sources: " + data.sources.map(s =>
+            `<span>${escapeHtml(s.source)} &gt; ${escapeHtml(s.heading)} (${escapeHtml(s.page)})</span>`
+          ).join(", ")
         : "No sources cited.";
     } catch (err) {
       showError("Could not reach the API. Is the server running?");
@@ -241,14 +268,16 @@
   }
 
   async function ingest() {
-    setBusy(true, "Rebuilding index...");
+    const strategy = strategyEl.value;
+
+    setBusy(true, `Rebuilding index (${strategy})...`);
     resultEl.classList.add("hidden");
 
     try {
       const response = await fetch("/api/v1/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: "{}",
+        body: JSON.stringify({ strategy }),
       });
 
       const data = await response.json();
@@ -259,7 +288,9 @@
       }
 
       resultEl.classList.remove("hidden");
-      answerEl.textContent = `Indexed ${data.documents} documents, ${data.chunks} chunks.`;
+      answerEl.textContent =
+        `Indexed ${data.documents} documents, ${data.chunks} chunks ` +
+        `using the "${data.strategy}" strategy.`;
       sourcesEl.textContent = "";
     } catch (err) {
       showError("Could not reach the API. Is the server running?");

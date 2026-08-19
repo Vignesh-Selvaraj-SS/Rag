@@ -55,19 +55,29 @@ class VectorStore:
         from app.services.chunk_service import embed_text
 
         if self.client.collection_exists(self.collection_name):
-            self.client.delete_collection(self.collection_name)
-
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(
-                size=self.embedding_service.dimension(),
-                distance=Distance.COSINE,
-            ),
-            hnsw_config=HnswConfigDiff(
-                m=HNSW_M,
-                ef_construct=HNSW_EF_CONSTRUCT,
-            ),
-        )
+            # Clear existing points via the delete API rather than
+            # delete_collection + create_collection: on Windows,
+            # deleting the collection's directory can silently fail
+            # (Qdrant swallows the error) if the local storage file is
+            # still open in this process, leaving stale points behind
+            # after "recreating" the collection - confirmed by testing
+            # a re-ingest with a different chunk count than before.
+            self.client.delete(
+                collection_name=self.collection_name,
+                points_selector=Filter(),
+            )
+        else:
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                    size=self.embedding_service.dimension(),
+                    distance=Distance.COSINE,
+                ),
+                hnsw_config=HnswConfigDiff(
+                    m=HNSW_M,
+                    ef_construct=HNSW_EF_CONSTRUCT,
+                ),
+            )
 
         for start in range(0, len(chunks), batch_size):
 

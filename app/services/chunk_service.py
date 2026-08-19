@@ -22,25 +22,58 @@ HEADING_PATTERN = re.compile(
     re.MULTILINE | re.VERBOSE,
 )
 
+# Fixed-size chunking parameters - only meaningful for the "fixed_size"
+# strategy below. Overlap exists so an idea sitting right at a window
+# boundary still appears whole in at least one chunk.
+FIXED_CHUNK_WORDS = 300
+FIXED_CHUNK_OVERLAP_WORDS = 50
+
+
+def _build_page_offsets(pages: list[dict]) -> list[tuple[int, int]]:
+    """
+    Map each page to the character offset where it starts, so a
+    chunk's position in the flattened document text can be traced
+    back to a page number. Shared by both chunking strategies below.
+    """
+
+    offsets = []
+    cursor = 0
+
+    for page in pages:
+        offsets.append((cursor, page["page"]))
+        cursor += len(page["text"]) + len(PAGE_SEPARATOR)
+
+    return offsets
+
+
+def _resolve_page_span(
+    start: int,
+    end: int,
+    offsets: list[tuple[int, int]]
+) -> tuple[int, int]:
+    """
+    Resolve a character range to the page numbers it spans.
+    """
+
+    starts = [offset for offset, _ in offsets]
+
+    first = max(bisect_right(starts, start) - 1, 0)
+    last = max(bisect_right(starts, max(start, end - 1)) - 1, 0)
+
+    return offsets[first][1], offsets[last][1]
+
 
 def create_chunks(document: dict) -> list[dict]:
     """
-    Turn one loaded document into chunks - one chunk per detected
-    section, from one heading to the next. No size budget, no
-    merging/splitting, no overlap - a chunk is exactly what the
-    document's own structure says it is.
+    Heading-based chunking: one chunk per detected section, from one
+    heading to the next. No size budget, no merging/splitting, no
+    overlap - a chunk is exactly what the document's own structure
+    says it is.
     """
 
     full_text = document["text"]
 
-    # Map each page to the character offset where it starts, so a
-    # chunk's position in full_text can be traced back to a page number.
-    offsets = []
-    cursor = 0
-    for page in document["pages"]:
-        offsets.append((cursor, page["page"]))
-        cursor += len(page["text"]) + len(PAGE_SEPARATOR)
-    starts = [offset for offset, _ in offsets]
+    offsets = _build_page_offsets(document["pages"])
 
     matches = list(HEADING_PATTERN.finditer(full_text))
 
@@ -78,10 +111,7 @@ def create_chunks(document: dict) -> list[dict]:
         start = section["start"]
         end = start + len(section["text"])
 
-        # Resolve this chunk's character span to the page(s) it spans.
-        first = max(bisect_right(starts, start) - 1, 0)
-        last = max(bisect_right(starts, max(start, end - 1)) - 1, 0)
-        page_start, page_end = offsets[first][1], offsets[last][1]
+        page_start, page_end = _resolve_page_span(start, end, offsets)
 
         chunks.append(
             {
@@ -107,6 +137,80 @@ def create_chunks_for_all(documents: list[dict]) -> list[dict]:
         chunks.extend(create_chunks(document))
 
     return chunks
+
+
+def create_fixed_size_chunks(document: dict) -> list[dict]:
+    """
+    Fixed-size chunking: split into overlapping windows of
+    FIXED_CHUNK_WORDS words, ignoring document structure entirely.
+    The classic RAG default - kept as a real, switchable alternative
+    to the heading-based strategy above, not the default here because
+    it was measured to perform worse on this corpus (see README.md).
+    """
+
+    full_text = document["text"]
+
+    offsets = _build_page_offsets(document["pages"])
+
+    words = list(re.finditer(r"\S+", full_text))
+
+    if not words:
+        return []
+
+    step = FIXED_CHUNK_WORDS - FIXED_CHUNK_OVERLAP_WORDS
+
+    chunks = []
+    index = 0
+    window_start = 0
+
+    while window_start < len(words):
+
+        window_end = min(window_start + FIXED_CHUNK_WORDS, len(words))
+
+        start = words[window_start].start()
+        end = words[window_end - 1].end()
+
+        page_start, page_end = _resolve_page_span(start, end, offsets)
+
+        chunks.append(
+            {
+                "chunk_id": f"{document['source']}::{index}",
+                "index": index,
+                "text": full_text[start:end],
+                "source": document["source"],
+                "heading": f"words {window_start + 1}-{window_end}",
+                "page_start": page_start,
+                "page_end": page_end,
+                "n_words": window_end - window_start,
+            }
+        )
+
+        index += 1
+
+        if window_end == len(words):
+            break
+
+        window_start += step
+
+    return chunks
+
+
+def create_fixed_size_chunks_for_all(documents: list[dict]) -> list[dict]:
+
+    chunks = []
+
+    for document in documents:
+        chunks.extend(create_fixed_size_chunks(document))
+
+    return chunks
+
+
+# Registry so the ingest pipeline can pick a strategy by name (e.g.
+# from a UI dropdown) without importing chunking internals directly.
+CHUNK_STRATEGIES = {
+    "heading": create_chunks_for_all,
+    "fixed_size": create_fixed_size_chunks_for_all,
+}
 
 
 def embed_text(chunk: dict) -> str:

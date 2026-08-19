@@ -28,7 +28,11 @@ async def chat(request: ChatRequest):
     return {
         "answer": result["answer"],
         "sources": [
-            {"page": hit["page_start"]}
+            {
+                "source": hit["source"],
+                "heading": hit["heading"],
+                "page": hit["page"],
+            }
             for hit in result["sources"]
         ],
     }
