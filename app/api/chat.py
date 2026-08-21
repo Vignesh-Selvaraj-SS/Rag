@@ -23,7 +23,7 @@ async def chat(request: ChatRequest):
 
     require_index()
 
-    result = rag_service.ask(request.question)
+    result = rag_service.ask(request.question, mode=request.mode)
 
     return {
         "answer": result["answer"],

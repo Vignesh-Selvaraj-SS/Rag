@@ -14,6 +14,8 @@
     --border: #ddd;
     --accent: #2f5d50;
     --accent-text: #ffffff;
+    --accent-soft: #e4efec;
+    --error: #c0392b;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -24,6 +26,8 @@
       --border: #3a3a3a;
       --accent: #4f9d87;
       --accent-text: #0d0d0d;
+      --accent-soft: #1e2e2a;
+      --error: #e07a6d;
     }
   }
   * { box-sizing: border-box; }
@@ -67,12 +71,18 @@
     font-size: 1rem;
     font-family: inherit;
     resize: vertical;
+    transition: border-color 0.15s ease;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
   }
   .row {
     display: flex;
     gap: 8px;
     margin-top: 10px;
     align-items: center;
+    flex-wrap: wrap;
   }
   button {
     border: none;
@@ -81,6 +91,7 @@
     font-size: 0.9rem;
     cursor: pointer;
     font-family: inherit;
+    transition: opacity 0.15s ease, transform 0.1s ease;
   }
   button.primary {
     background: var(--accent);
@@ -90,6 +101,16 @@
     background: transparent;
     color: var(--muted);
     border: 1px solid var(--border);
+  }
+  button.small {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+  button:not(:disabled):hover {
+    opacity: 0.85;
+  }
+  button:not(:disabled):active {
+    transform: scale(0.97);
   }
   button:disabled {
     opacity: 0.5;
@@ -108,29 +129,14 @@
     opacity: 0.5;
     cursor: default;
   }
+  input[type="file"] {
+    font-size: 0.8rem;
+    color: var(--muted);
+    max-width: 220px;
+  }
   .status {
     font-size: 0.85rem;
     color: var(--muted);
-  }
-  .answer {
-    margin-top: 4px;
-    white-space: pre-wrap;
-    line-height: 1.5;
-  }
-  .sources {
-    margin-top: 12px;
-    font-size: 0.85rem;
-    color: var(--muted);
-  }
-  .sources span {
-    display: inline-block;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 2px 8px;
-    margin-right: 6px;
-  }
-  .error {
-    color: #c0392b;
   }
   .hidden { display: none; }
   .samples {
@@ -150,6 +156,132 @@
   .samples button:hover {
     border-color: var(--accent);
   }
+
+  /* --- Conversation feed --- */
+  .conversation-card {
+    padding: 16px;
+  }
+  .conversation-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px 12px;
+  }
+  .conversation-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .conversation {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding: 4px;
+    scroll-behavior: smooth;
+  }
+  .empty-state {
+    color: var(--muted);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 28px 12px;
+    margin: 0;
+  }
+  .message {
+    max-width: 88%;
+    animation: message-in 0.2s ease both;
+  }
+  @keyframes message-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  .message.user {
+    align-self: flex-end;
+  }
+  .message.assistant,
+  .message.system {
+    align-self: flex-start;
+  }
+  .message .role {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin: 0 4px 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .message .bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    font-size: 0.95rem;
+  }
+  .message.user .bubble {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-bottom-right-radius: 4px;
+  }
+  .message.assistant .bubble {
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .message.assistant .bubble.error {
+    color: var(--error);
+    border-color: var(--error);
+    background: transparent;
+  }
+  .message.system {
+    align-self: center;
+    max-width: 100%;
+  }
+  .message.system .bubble {
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 4px 10px;
+    white-space: normal;
+  }
+  .message .meta {
+    margin: 6px 4px 0;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .message .sources {
+    margin: 8px 4px 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .message .sources span {
+    display: inline-block;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    margin: 2px 4px 2px 0;
+  }
+  .typing-dots {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 2px 0;
+  }
+  .typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: typing-blink 1.2s infinite both;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-blink {
+    0%, 80%, 100% { opacity: 0.25; }
+    40% { opacity: 1; }
+  }
 </style>
 </head>
 <body>
@@ -160,20 +292,37 @@
   <div class="card">
     <textarea id="question" placeholder="e.g. What deductible applies to a water backup claim?"></textarea>
     <div class="row">
-      <button class="primary" id="ask">Ask</button>
+      <button class="primary" id="ask" type="button">Ask</button>
+      <select id="searchMode" title="How the question is matched to document chunks">
+        <option value="dense">Search: meaning only</option>
+        <option value="hybrid">Search: meaning + keyword</option>
+        <option value="rerank">Search: reranked (cross-encoder)</option>
+        <option value="mmr">Search: diverse (MMR)</option>
+        <option value="rewrite">Search: rewritten query</option>
+        <option value="hyde">Search: HyDE</option>
+      </select>
       <select id="strategy" title="Chunking strategy used when rebuilding the index">
         <option value="heading">Chunk by heading</option>
         <option value="fixed_size">Chunk by fixed size</option>
       </select>
-      <button class="secondary" id="ingest" title="Rebuild the index from data/">Rebuild index</button>
+      <button class="secondary" id="ingest" type="button" title="Rebuild the index from data/">Rebuild index</button>
       <span class="status" id="status"></span>
+    </div>
+    <div class="row">
+      <input type="file" id="fileInput" accept=".pdf,.md,.markdown,.txt" title="Choose a document to add to data/" aria-label="Choose a document to upload">
+      <button class="secondary" id="upload" type="button" title="Add a document to data/ (does not rebuild the index)">Upload</button>
     </div>
     <div class="samples" id="samples"></div>
   </div>
 
-  <div class="card hidden" id="result">
-    <div class="answer" id="answerText"></div>
-    <div class="sources" id="sourcesText"></div>
+  <div class="card conversation-card">
+    <div class="conversation-header">
+      <span class="conversation-title">Conversation</span>
+      <button class="secondary small" id="clearChat" type="button">Clear chat</button>
+    </div>
+    <div class="conversation" id="conversation">
+      <p class="empty-state" id="emptyState">Ask a question above, or click a sample — the conversation will appear here.</p>
+    </div>
   </div>
 </main>
 
@@ -182,11 +331,23 @@
   const askBtn = document.getElementById("ask");
   const ingestBtn = document.getElementById("ingest");
   const strategyEl = document.getElementById("strategy");
+  const searchModeEl = document.getElementById("searchMode");
+  const fileInputEl = document.getElementById("fileInput");
+  const uploadBtn = document.getElementById("upload");
   const statusEl = document.getElementById("status");
-  const resultEl = document.getElementById("result");
-  const answerEl = document.getElementById("answerText");
-  const sourcesEl = document.getElementById("sourcesText");
   const samplesEl = document.getElementById("samples");
+  const conversationEl = document.getElementById("conversation");
+  const emptyStateEl = document.getElementById("emptyState");
+  const clearChatBtn = document.getElementById("clearChat");
+
+  const SEARCH_MODE_LABELS = {
+    dense: "meaning only",
+    hybrid: "meaning + keyword",
+    rerank: "reranked (cross-encoder)",
+    mmr: "diverse (MMR)",
+    rewrite: "rewritten query",
+    hyde: "HyDE",
+  };
 
   const SAMPLE_QUESTIONS = [
     "What deductible applies to a water backup claim?",
@@ -203,7 +364,7 @@
     button.textContent = sample;
     button.addEventListener("click", () => {
       questionEl.value = sample;
-      questionEl.focus();
+      ask();
     });
     samplesEl.appendChild(button);
   }
@@ -212,8 +373,9 @@
     askBtn.disabled = busy;
     ingestBtn.disabled = busy;
     strategyEl.disabled = busy;
+    searchModeEl.disabled = busy;
+    uploadBtn.disabled = busy;
     statusEl.textContent = message || "";
-    statusEl.classList.remove("error");
   }
 
   function escapeHtml(text) {
@@ -222,46 +384,115 @@
     return div.innerHTML;
   }
 
-  function showError(message) {
-    resultEl.classList.remove("hidden");
-    answerEl.textContent = "";
-    answerEl.classList.add("error");
-    answerEl.textContent = message;
-    sourcesEl.textContent = "";
+  function scrollToBottom() {
+    conversationEl.scrollTop = conversationEl.scrollHeight;
+  }
+
+  function addMessage(role, { text, html, isError } = {}) {
+    emptyStateEl.classList.add("hidden");
+
+    const wrapper = document.createElement("div");
+    wrapper.className = `message ${role}`;
+
+    if (role !== "system") {
+      const roleLabel = document.createElement("div");
+      roleLabel.className = "role";
+      roleLabel.textContent = role === "user" ? "You" : "Assistant";
+      wrapper.appendChild(roleLabel);
+    }
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble" + (isError ? " error" : "");
+    if (html !== undefined) {
+      bubble.innerHTML = html;
+    } else {
+      bubble.textContent = text || "";
+    }
+    wrapper.appendChild(bubble);
+
+    conversationEl.appendChild(wrapper);
+    scrollToBottom();
+    return wrapper;
+  }
+
+  function addTypingIndicator() {
+    const wrapper = addMessage("assistant", {
+      html: '<span class="typing-dots"><span></span><span></span><span></span></span>',
+    });
+    return wrapper;
+  }
+
+  function replaceAssistantMessage(wrapper, { text, sourcesHtml, metaText, isError }) {
+    const bubble = wrapper.querySelector(".bubble");
+    bubble.classList.toggle("error", !!isError);
+    bubble.textContent = text;
+
+    const existingMeta = wrapper.querySelector(".meta, .sources");
+    if (existingMeta) existingMeta.remove();
+
+    if (metaText) {
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = metaText;
+      wrapper.appendChild(meta);
+    }
+
+    if (sourcesHtml) {
+      const sources = document.createElement("div");
+      sources.className = "sources";
+      sources.innerHTML = sourcesHtml;
+      wrapper.appendChild(sources);
+    }
+
+    scrollToBottom();
   }
 
   async function ask() {
     const question = questionEl.value.trim();
     if (!question) return;
 
-    setBusy(true, "Thinking...");
-    resultEl.classList.add("hidden");
-    answerEl.classList.remove("error");
+    const mode = searchModeEl.value;
+
+    addMessage("user", { text: question });
+    questionEl.value = "";
+    questionEl.focus();
+
+    const placeholder = addTypingIndicator();
+    setBusy(true);
 
     try {
       const response = await fetch("/api/v1/chat/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, mode }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        showError(body.detail || `Request failed (${response.status})`);
+        replaceAssistantMessage(placeholder, {
+          text: data.detail || `Request failed (${response.status})`,
+          isError: true,
+        });
         return;
       }
 
-      const data = await response.json();
-      resultEl.classList.remove("hidden");
-      answerEl.textContent = data.answer;
-
-      sourcesEl.innerHTML = data.sources.length
+      const sourcesHtml = data.sources.length
         ? "Sources: " + data.sources.map(s =>
             `<span>${escapeHtml(s.source)} &gt; ${escapeHtml(s.heading)} (${escapeHtml(s.page)})</span>`
           ).join(", ")
         : "No sources cited.";
+
+      replaceAssistantMessage(placeholder, {
+        text: data.answer,
+        sourcesHtml,
+        metaText: `search: ${SEARCH_MODE_LABELS[mode] || mode}`,
+      });
     } catch (err) {
-      showError("Could not reach the API. Is the server running?");
+      replaceAssistantMessage(placeholder, {
+        text: "Could not reach the API. Is the server running?",
+        isError: true,
+      });
     } finally {
       setBusy(false);
     }
@@ -271,7 +502,6 @@
     const strategy = strategyEl.value;
 
     setBusy(true, `Rebuilding index (${strategy})...`);
-    resultEl.classList.add("hidden");
 
     try {
       const response = await fetch("/api/v1/ingest", {
@@ -283,30 +513,67 @@
       const data = await response.json();
 
       if (!response.ok) {
-        showError(data.detail || `Request failed (${response.status})`);
+        addMessage("system", { text: data.detail || `Request failed (${response.status})` });
         return;
       }
 
-      resultEl.classList.remove("hidden");
-      answerEl.textContent =
-        `Indexed ${data.documents} documents, ${data.chunks} chunks ` +
-        `using the "${data.strategy}" strategy.`;
-      sourcesEl.textContent = "";
+      addMessage("system", {
+        text: `Rebuilt index: ${data.documents} documents, ${data.chunks} chunks, "${data.strategy}" strategy.`,
+      });
     } catch (err) {
-      showError("Could not reach the API. Is the server running?");
+      addMessage("system", { text: "Could not reach the API. Is the server running?" });
     } finally {
       setBusy(false);
     }
   }
 
+  async function upload() {
+    const file = fileInputEl.files[0];
+    if (!file) return;
+
+    setBusy(true, "Uploading...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/v1/documents", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        addMessage("system", { text: data.detail || `Upload failed (${response.status})` });
+        return;
+      }
+
+      addMessage("system", { text: `Uploaded ${data.filename} (${data.bytes.toLocaleString()} bytes). ${data.message}` });
+      fileInputEl.value = "";
+    } catch (err) {
+      addMessage("system", { text: "Could not reach the API. Is the server running?" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearChat() {
+    conversationEl.querySelectorAll(".message").forEach(el => el.remove());
+    emptyStateEl.classList.remove("hidden");
+  }
+
   askBtn.addEventListener("click", ask);
   ingestBtn.addEventListener("click", ingest);
+  uploadBtn.addEventListener("click", upload);
+  clearChatBtn.addEventListener("click", clearChat);
   questionEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       ask();
     }
   });
+  questionEl.focus();
 </script>
 </body>
 </html>

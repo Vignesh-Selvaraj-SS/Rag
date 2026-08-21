@@ -3,6 +3,7 @@ Ask a question against the ingested documents.
 
     python ask.py "What deductible applies to a water backup claim?"
     python ask.py --search-only "Why is my roof cheque smaller than the estimate?"
+    python ask.py --mode hybrid "Which territories prohibit roof ACV settlement?"
 """
 
 import argparse
@@ -16,9 +17,12 @@ def print_hits(hits: list[dict], min_score: float):
     print(f"\nRetrieved {len(hits)} chunks (gate: {min_score:.2f}):")
 
     for number, hit in enumerate(hits, start=1):
-        flag = "pass" if hit["score"] >= min_score else "weak"
+        # The gate flag checks dense_score (a cosine similarity) even
+        # in hybrid mode, where "score" is a fused RRF value on a
+        # different scale - see retrieval_service.py.
+        flag = "pass" if hit["dense_score"] >= min_score else "weak"
         print(
-            f"  [S{number}] {hit['score']:.3f} {flag}  "
+            f"  [S{number}] score={hit['score']:.3f} {flag}  "
             f"{hit['source']} > {hit['heading']}  ({hit['page']})"
         )
 
@@ -31,6 +35,11 @@ def main() -> int:
     parser.add_argument("--min-score", type=float, default=settings.MIN_SCORE)
     parser.add_argument("--source", default=None)
     parser.add_argument("--search-only", action="store_true")
+    parser.add_argument(
+        "--mode",
+        choices=["dense", "hybrid", "rerank", "mmr", "rewrite", "hyde"],
+        default="dense",
+    )
     args = parser.parse_args()
 
     question = " ".join(args.question)
@@ -46,6 +55,7 @@ def main() -> int:
             top_k=args.top_k,
             min_score=args.min_score,
             source=args.source,
+            mode=args.mode,
         )
 
         print_hits(retrieval["hits"], args.min_score)
@@ -57,6 +67,7 @@ def main() -> int:
         top_k=args.top_k,
         min_score=args.min_score,
         source=args.source,
+        mode=args.mode,
     )
 
     print_hits(result["retrieved"], args.min_score)

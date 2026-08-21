@@ -21,6 +21,7 @@ class RAGService:
         top_k: int | None = None,
         min_score: float | None = None,
         source: str | None = None,
+        mode: str = "dense",
     ) -> dict:
         """
         Retrieve chunks, then generate an answer citing only what it
@@ -34,6 +35,7 @@ class RAGService:
             top_k=top_k,
             min_score=min_score,
             source=source,
+            mode=mode,
         )
 
         if not retrieval["passes_gate"]:
@@ -73,6 +75,7 @@ class RAGService:
         top_k: int | None = None,
         min_score: float | None = None,
         source: str | None = None,
+        mode: str = "dense",
     ) -> dict:
 
         return self.retriever.retrieve(
@@ -80,6 +83,7 @@ class RAGService:
             top_k=top_k,
             min_score=min_score,
             source=source,
+            mode=mode,
         )
 
     def ingest(self, strategy: str = "heading") -> dict:
