@@ -1,7 +1,13 @@
 from app.core.config import DATA_DIR, settings
 from app.services.chunk_service import CHUNK_STRATEGIES
 from app.services.document_loader import load_directory
-from app.services.llm_service import LLMService, REFUSAL_MESSAGE
+from app.services.llm_service import (
+    LLMService,
+    MAX_TOKENS,
+    PROMPT_VERSION,
+    REFUSAL_MESSAGE,
+    TEMPERATURE,
+)
 from app.services.retrieval_service import RetrievalService
 
 
@@ -38,6 +44,17 @@ class RAGService:
             mode=mode,
         )
 
+        # Resolved rather than requested, so a trace records the values the
+        # run actually used even when the caller passed nothing.
+        params = {
+            "mode": mode,
+            "top_k": settings.TOP_K if top_k is None else top_k,
+            "min_score": settings.MIN_SCORE if min_score is None else min_score,
+            "source_filter": source,
+            "temperature": TEMPERATURE,
+            "max_tokens": MAX_TOKENS,
+        }
+
         if not retrieval["passes_gate"]:
             return {
                 "question": question,
@@ -48,6 +65,9 @@ class RAGService:
                 "retrieved": retrieval["hits"],
                 "invalid_citations": [],
                 "model": "(no model call)",
+                "params": params,
+                "prompt_version": PROMPT_VERSION,
+                "raw_output": None,
             }
 
         result = self.llm.generate_answer(question, retrieval["hits"])
@@ -67,6 +87,9 @@ class RAGService:
             "retrieved": retrieval["hits"],
             "invalid_citations": result["invalid_citations"],
             "model": settings.MODEL_NAME,
+            "params": params,
+            "prompt_version": result["prompt_version"],
+            "raw_output": result["raw_output"],
         }
 
     def search(

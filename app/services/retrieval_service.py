@@ -109,6 +109,10 @@ class RetrievalService:
 
             hits.append(
                 {
+                    # Carried through so a trace can name the exact chunk that
+                    # was retrieved, not just its file and heading - without it
+                    # a recorded run cannot be replayed or audited.
+                    "chunk_id": result.get("chunk_id", ""),
                     "text": result.get("text", ""),
                     "source": result.get("source", "unknown"),
                     "heading": result.get("heading", ""),

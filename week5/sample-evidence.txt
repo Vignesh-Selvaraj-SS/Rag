@@ -1,0 +1,27 @@
+trace file : D:\Repos\Rag\week5\traces.jsonl
+frame      : 100 trace_ids (origin=random)
+seed       : 20260902
+selected   : 20
+
+t_0003,t_0012,t_0026,t_0036,t_0040,t_0047,t_0048,t_0059,t_0060,t_0062,t_0070,t_0071,t_0074,t_0080,t_0081,t_0082,t_0087,t_0091,t_0094,t_0096
+
+  t_0003  Q003 [A]  answered  Under HO-2026-02, exactly where does service line coverage begin and end
+  t_0012  Q012 [A]  answered  What business liability limit applies under Part 2 of HO-2026-06?
+  t_0026  Q026 [B]  answered  Does the base policy cover ordinance or law costs at all, or only with H
+  t_0036  Q036 [C]  answered  A service line failure was caused by a contractor. What does the subroga
+  t_0040  Q040 [C]  answered  A home-sharing guest is injured. Which severity tier is this at FNOL, an
+  t_0047  Q047 [C]  refused  What is the response target for a severity tier 1 loss, and which endors
+  t_0048  Q048 [C]  refused  A home business laptop is stolen in a burglary. Which document sets the 
+  t_0059  Q059 [D]  answered  What emergency mitigation authority exists before coverage is confirmed?
+  t_0060  Q060 [D]  answered  How is coverage confirmation handled at FNOL?
+  t_0062  Q062 [D]  answered  When must a claim be escalated, and to whom?
+  t_0070  Q070 [E]  refused  What is the commercial general liability limit for a contractor?
+  t_0071  Q071 [E]  refused  How much life insurance should I buy?
+  t_0074  Q074 [E]  refused  What is the surrender value of my annuity?
+  t_0080  Q080 [F]  answered  What edition applies to my claim?
+  t_0081  Q081 [F]  answered  Can I get more coverage?
+  t_0082  Q082 [F]  answered  Why was my claim reduced?
+  t_0087  Q087 [G]  answered  My air conditioner died last week. Is that a claim?
+  t_0091  Q091 [G]  answered  My roof was damaged by hail. Why is the cheque less than my contractor's
+  t_0094  Q042 [C]  answered  A basement flooded and the freezer failed. Which two endorsements respon
+  t_0096  Q096 [G]  refused  Following up on claim [CLAIM_NO] for [CLAIMANT] — his air conditioner fa
