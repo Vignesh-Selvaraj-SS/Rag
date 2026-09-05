@@ -1,0 +1,81 @@
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: minmax(90px, 32%) 1fr 40px;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.bar__track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.bar__fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 5px;
+  min-width: 2px;
+}
+
+.bar__fill--pass {
+  background: var(--success);
+}
+
+.bar__fill--review {
+  background: var(--warning);
+}
+
+.bar__fill--fail {
+  background: var(--danger);
+}
+
+.bar__value {
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.columns {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+  padding-top: 8px;
+}
+
+.column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+  min-width: 0;
+}
+
+.column__fill {
+  width: 100%;
+  max-width: 36px;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+}
+
+.column__label {
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.table-wrap--flat {
+  border: none;
+  border-radius: 0;
+}

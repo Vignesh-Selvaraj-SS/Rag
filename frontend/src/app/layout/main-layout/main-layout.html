@@ -1,0 +1,54 @@
+<div class="shell" [class.shell--menu-open]="menuOpen()">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <aside class="sidebar" aria-label="Primary">
+    <div class="sidebar__brand">
+      <span class="sidebar__logo" aria-hidden="true">◈</span>
+      <div>
+        <div class="sidebar__title">{{ appName() }}</div>
+        <div class="sidebar__subtitle">Grounded answers, cited</div>
+      </div>
+    </div>
+
+    <nav class="sidebar__nav">
+      @for (item of items(); track item.path) {
+        <a
+          class="nav-item"
+          [routerLink]="item.path"
+          routerLinkActive="nav-item--active"
+          [routerLinkActiveOptions]="{ exact: false }"
+          ariaCurrentWhenActive="page"
+          (click)="closeMenu()"
+        >
+          <span class="nav-item__icon" aria-hidden="true">{{ item.icon }}</span>
+          <span>{{ item.label }}</span>
+          @if (item.developer) {
+            <span class="badge badge--accent nav-item__badge">dev</span>
+          }
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar__footer">
+      <app-health-indicator />
+      @if (version()) {
+        <span class="faint small">v{{ version() }}</span>
+      }
+    </div>
+  </aside>
+
+  <div class="backdrop" (click)="closeMenu()" aria-hidden="true"></div>
+
+  <div class="content">
+    <header class="topbar">
+      <button type="button" class="btn btn--ghost btn--icon topbar__menu" aria-label="Toggle navigation" (click)="toggleMenu()">
+        ☰
+      </button>
+      <span class="topbar__title">{{ appName() }}</span>
+    </header>
+
+    <main id="main" class="main" tabindex="-1">
+      <router-outlet />
+    </main>
+  </div>
+</div>

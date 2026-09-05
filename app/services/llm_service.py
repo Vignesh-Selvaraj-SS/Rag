@@ -1,8 +1,12 @@
+import logging
 import re
 
-from groq import Groq
+from groq import Groq, GroqError
 
 from app.core.config import settings
+from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
+
+logger = logging.getLogger(__name__)
 
 REFUSAL_MESSAGE = "I don't know - the documents provided don't cover this."
 
@@ -56,10 +60,7 @@ class LLMService:
     def generate_answer(self, question: str, hits: list[dict]) -> dict:
 
         if self.client is None:
-            raise RuntimeError(
-                "GROQ_API_KEY is not set. Copy .env.example to .env and "
-                "add your key from https://console.groq.com/keys"
-            )
+            raise LLMNotConfiguredError()
 
         sources = "\n\n".join(
             f"[S{number}] file: {hit['source']} | "
@@ -74,21 +75,19 @@ class LLMService:
             f'If the answer is not there, reply exactly: "{REFUSAL_MESSAGE}"'
         )
 
-        response = self.client.chat.completions.create(
-            model=settings.MODEL_NAME,
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
-            messages=[
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=settings.MODEL_NAME,
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+        except GroqError as error:
+            logger.warning("Groq call failed: %s: %s", type(error).__name__, error)
+            raise LLMUpstreamError() from error
 
         raw_output = response.choices[0].message.content or ""
 

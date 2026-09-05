@@ -1,0 +1,152 @@
+<div class="page">
+  <app-page-header title="Analytics" subtitle="What people ask and how the assistant responds, computed from the recorded traces.">
+    <button type="button" class="btn btn--sm" (click)="load()" [disabled]="loading()">Refresh</button>
+  </app-page-header>
+
+  @if (loading()) {
+    <app-loading-indicator message="Computing statistics…" />
+  } @else if (error()) {
+    <app-error-state title="Unable to load analytics" [error]="error()" (retry)="load()" />
+  } @else if (stats(); as s) {
+    @if (s.total === 0) {
+      <app-empty-state icon="📈" title="No questions recorded yet" description="Analytics appear once questions have been asked in Chat.">
+        <a class="btn btn--primary" routerLink="/chat">Go to Chat</a>
+      </app-empty-state>
+    } @else {
+      <div class="grid grid--stats">
+        <div class="stat">
+          <span class="stat__label">Questions</span>
+          <span class="stat__value">{{ s.total | number }}</span>
+          <span class="stat__hint">{{ s.by_day.length }} active day{{ s.by_day.length === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Answered</span>
+          <span class="stat__value">{{ answeredRate() | percent: '1.0-0' }}</span>
+          <span class="stat__hint">{{ s.answered }} answered · {{ s.refused }} refused</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Refusals</span>
+          <span class="stat__value">{{ s.refused | number }}</span>
+          <span class="stat__hint">{{ s.refused_by_gate }} by similarity gate · {{ s.refused_by_model }} by model</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Latency p50 / p95</span>
+          <span class="stat__value">{{ s.latency_p50_ms | duration }}</span>
+          <span class="stat__hint">p95 {{ s.latency_p95_ms | duration }} · avg {{ s.latency_avg_ms | duration }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Citation issues</span>
+          <span class="stat__value">{{ s.answered_without_citation + s.with_invalid_citations | number }}</span>
+          <span class="stat__hint">{{ s.answered_without_citation }} uncited answers · {{ s.with_invalid_citations }} invented tags</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Identifiers redacted</span>
+          <span class="stat__value">{{ s.identifiers_redacted | number }}</span>
+          <span class="stat__hint">claim numbers, policy numbers, names</span>
+        </div>
+      </div>
+
+      <div class="grid grid--2">
+        <section class="card">
+          <div class="card__header"><span class="card__title">Quality checks</span><span class="faint small">per question, automatic</span></div>
+          <div class="bars">
+            @for (bar of checkBars(); track bar.label) {
+              <div class="bar">
+                <span class="bar__label">{{ bar.label }}</span>
+                <div class="bar__track"><div class="bar__fill" [class]="'bar__fill bar__fill--' + bar.label.toLowerCase()" [style.width.%]="bar.percent"></div></div>
+                <span class="bar__value mono">{{ bar.value }}</span>
+              </div>
+            }
+          </div>
+          <p class="faint small">Fail: truncated answer, uncited facts or invented citation tags. Review: the model refused although retrieval passed the gate.</p>
+        </section>
+
+        <section class="card">
+          <div class="card__header"><span class="card__title">Search modes used</span></div>
+          <div class="bars">
+            @for (bar of modeBars(); track bar.label) {
+              <div class="bar">
+                <span class="bar__label">{{ bar.label }}</span>
+                <div class="bar__track"><div class="bar__fill" [style.width.%]="bar.percent"></div></div>
+                <span class="bar__value mono">{{ bar.value }}</span>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card__header"><span class="card__title">Most cited documents</span></div>
+          @if (!sourceBars().length) {
+            <p class="muted small">No answer has cited a document yet.</p>
+          }
+          <div class="bars">
+            @for (bar of sourceBars(); track bar.label) {
+              <div class="bar">
+                <span class="bar__label truncate" [title]="bar.label">{{ bar.label }}</span>
+                <div class="bar__track"><div class="bar__fill" [style.width.%]="bar.percent"></div></div>
+                <span class="bar__value mono">{{ bar.value }}</span>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card__header"><span class="card__title">Questions per day</span><span class="faint small">last 14 days with activity</span></div>
+          <div class="columns" role="img" [attr.aria-label]="'Questions per day: ' + dayBars().length + ' days'">
+            @for (bar of dayBars(); track bar.label) {
+              <div class="column" [title]="bar.label + ': ' + bar.value">
+                <div class="column__fill" [style.height.%]="bar.percent"></div>
+                <span class="column__label faint">{{ bar.label | date: 'd MMM' }}</span>
+              </div>
+            }
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="card__header">
+          <span class="card__title">Recent questions</span>
+          @if (developerMode()) {
+            <a class="btn btn--ghost btn--sm" routerLink="/developer/traces">All traces</a>
+          }
+        </div>
+        <div class="table-wrap table-wrap--flat">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Question</th>
+                <th>Outcome</th>
+                <th>Check</th>
+                <th class="num">Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (trace of recent(); track trace.trace_id) {
+                <tr>
+                  <td class="nowrap muted small">{{ trace.timestamp | relativeTime }}</td>
+                  <td>
+                    @if (developerMode()) {
+                      <a [routerLink]="['/developer/traces', trace.trace_id]">{{ trace.question }}</a>
+                    } @else {
+                      {{ trace.question }}
+                    }
+                  </td>
+                  <td>
+                    @if (trace.refused) {
+                      <app-status-badge [status]="trace.refused_by ?? 'refused'" />
+                    } @else {
+                      <span class="badge badge--success">Answered · {{ trace.cited_count }} source{{ trace.cited_count === 1 ? '' : 's' }}</span>
+                    }
+                  </td>
+                  <td><app-status-badge [status]="trace.check_status" /></td>
+                  <td class="num">{{ trace.latency_ms | duration }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</div>

@@ -1,0 +1,164 @@
+<div class="page">
+  <app-page-header title="Documents" subtitle="The knowledge base the assistant answers from. Upload files, then rebuild the index to make them searchable.">
+    <label class="btn btn--primary upload-button" [class.upload-button--busy]="uploading()">
+      <input
+        type="file"
+        class="visually-hidden"
+        multiple
+        [accept]="acceptedExtensions()"
+        [disabled]="uploading() || rebuilding()"
+        (change)="onFileInput($event)"
+      />
+      {{ uploading() ? 'Uploading ' + uploadProgress() + '%' : 'Upload' }}
+    </label>
+  </app-page-header>
+
+  <!-- Knowledge base overview -->
+  <section class="card kb">
+    <div class="kb__main">
+      <div class="kb__title">
+        <span class="kb__icon" aria-hidden="true">📚</span>
+        <div>
+          <h2>Knowledge base</h2>
+          @if (index(); as idx) {
+            <p class="muted small">
+              @if (idx.ready) {
+                Collection <span class="mono">{{ idx.collection }}</span>
+                @if (idx.built_at) {
+                  · built {{ idx.built_at | relativeTime }}
+                  <span class="faint">({{ idx.built_at | date: 'medium' }})</span>
+                }
+              } @else {
+                Nothing is indexed yet. Upload documents and rebuild the index.
+              }
+            </p>
+          }
+        </div>
+      </div>
+      @if (index(); as idx) {
+        <div class="kb__stats">
+          <div class="stat">
+            <span class="stat__label">Documents</span>
+            <span class="stat__value">{{ idx.documents ?? documents().length | number }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Chunks</span>
+            <span class="stat__value">{{ idx.chunks | number }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Chunking</span>
+            <span class="stat__value stat__value--text">{{ idx.strategy ? serverConfig.strategyLabel(idx.strategy) : '—' }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Status</span>
+            <span class="stat__value stat__value--text">
+              @if (!idx.ready) {
+                <span class="badge badge--danger">Empty</span>
+              } @else if (pendingCount() > 0) {
+                <span class="badge badge--warning">{{ pendingCount() }} change{{ pendingCount() === 1 ? '' : 's' }} pending</span>
+              } @else {
+                <span class="badge badge--success">Up to date</span>
+              }
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="kb__rebuild">
+      <div class="field">
+        <label class="field__label" for="strategy">Chunking strategy</label>
+        <select id="strategy" class="select" [ngModel]="strategy()" (ngModelChange)="strategy.set($event)" [disabled]="rebuilding()">
+          @for (option of serverConfig.strategies(); track option.id) {
+            <option [value]="option.id">{{ option.label }}</option>
+          }
+        </select>
+        <span class="field__hint">
+          {{ serverConfig.strategies().length ? (serverConfig.strategies() | strategyHint: strategy()) : '' }}
+        </span>
+      </div>
+      <button type="button" class="btn" [class.btn--primary]="needsRebuild()" [disabled]="rebuilding() || uploading() || !documents().length" (click)="rebuild()">
+        {{ rebuilding() ? 'Rebuilding…' : 'Rebuild index' }}
+      </button>
+      @if (rebuilding()) {
+        <span class="small muted">Reading, chunking and embedding every document. PDFs with images take longer.</span>
+      }
+    </div>
+  </section>
+
+  <!-- Document list -->
+  <section
+    class="dropzone"
+    [class.dropzone--active]="dragging()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="dragging.set(false)"
+    (drop)="onDrop($event)"
+  >
+    @if (loading()) {
+      <app-loading-indicator message="Loading documents…" />
+    } @else if (loadError()) {
+      <app-error-state title="Unable to load documents" [error]="loadError()" (retry)="load()" />
+    } @else if (!documents().length) {
+      <app-empty-state
+        icon="📄"
+        title="No documents yet"
+        [description]="'Drop PDF, Markdown or text files here (up to ' + maxUploadMb() + ' MB each), or use Upload.'"
+      >
+        <label class="btn btn--primary">
+          <input type="file" class="visually-hidden" multiple [accept]="acceptedExtensions()" (change)="onFileInput($event)" />
+          Upload document
+        </label>
+      </app-empty-state>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Document</th>
+              <th>Status</th>
+              <th class="num">Size</th>
+              <th class="num">Pages</th>
+              <th class="num">Chunks</th>
+              <th>Modified</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (doc of documents(); track doc.name) {
+              <tr>
+                <td>
+                  <div class="doc">
+                    <span class="doc__ext badge">{{ doc.extension }}</span>
+                    <span class="doc__name">{{ doc.name }}</span>
+                  </div>
+                </td>
+                <td><app-status-badge [status]="doc.status" /></td>
+                <td class="num">{{ doc.bytes | fileSize }}</td>
+                <td class="num">{{ doc.pages ?? '—' }}</td>
+                <td class="num">{{ doc.chunks ?? '—' }}</td>
+                <td class="nowrap muted small" [title]="doc.modified_at ?? ''">{{ doc.modified_at | relativeTime }}</td>
+                <td class="num">
+                  @if (doc.status !== 'removed') {
+                    <button type="button" class="btn btn--ghost btn--sm" (click)="askDelete(doc)" [disabled]="rebuilding()">Delete</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="faint small drop-hint">Drop files anywhere on this list to upload them.</p>
+    }
+  </section>
+</div>
+
+<app-confirm-dialog
+  [open]="pendingDelete() !== null"
+  title="Delete document?"
+  [message]="(pendingDelete()?.name ?? '') + ' will be removed from the knowledge base folder. Its chunks stay searchable until the next rebuild.'"
+  confirmLabel="Delete"
+  [destructive]="true"
+  [busy]="deleting()"
+  (confirmed)="confirmDelete()"
+  (cancelled)="pendingDelete.set(null)"
+/>

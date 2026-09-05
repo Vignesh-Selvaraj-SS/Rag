@@ -181,9 +181,8 @@ class VectorStore:
     ) -> list[dict]:
         """
         Dense search fused with BM25 keyword search via Reciprocal
-        Rank Fusion (k=60) - see app/services/hybrid_search.py. This
-        is the Week 4 retrieval change, measured in week4/results.md
-        before being wired in here.
+        Rank Fusion (k=60) - see app/services/hybrid_search.py. Measured
+        in docs/training/week4/results.md before being wired in here.
         """
 
         from app.services.hybrid_search import BM25Index, fuse_with_rrf

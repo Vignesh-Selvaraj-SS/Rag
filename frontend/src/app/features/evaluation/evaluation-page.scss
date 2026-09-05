@@ -1,0 +1,111 @@
+.run-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.run-form .select {
+  width: auto;
+}
+
+.run-form__label {
+  width: 180px;
+}
+
+.delta {
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+.delta--up {
+  color: var(--success);
+}
+
+.delta--down {
+  color: var(--danger);
+}
+
+.q {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+tr.miss td:first-child {
+  border-left: 3px solid var(--danger);
+}
+
+tr.selected {
+  background: var(--accent-soft);
+}
+
+tr.expanded td {
+  background: var(--bg-muted);
+}
+
+.hits {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.hits li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hits__expected {
+  font-weight: 600;
+}
+
+.golden .input,
+.golden .textarea {
+  padding: 5px 8px;
+  font-size: 0.85rem;
+}
+
+.golden__question {
+  min-height: 0;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 50;
+}
+
+.sheet {
+  width: min(760px, 100vw);
+  height: 100vh;
+  overflow-y: auto;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: slide-in 0.2s ease both;
+}
+
+.q-text {
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}

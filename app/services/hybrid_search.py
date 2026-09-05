@@ -4,8 +4,8 @@ from rank_bm25 import BM25Okapi
 
 from app.services.chunk_service import embed_text
 
-# Reciprocal Rank Fusion constant - matches the Week 4 evaluation
-# (week4/hybrid_retrieval.py) that measured this before it shipped.
+# Reciprocal Rank Fusion constant. Measured before shipping; the write-up
+# lives in docs/training/week4/results.md.
 RRF_K = 60
 
 

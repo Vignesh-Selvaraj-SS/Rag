@@ -1,0 +1,161 @@
+<a routerLink="/developer/traces" class="back small">← All traces</a>
+
+@if (loading()) {
+  <app-loading-indicator message="Loading trace…" />
+} @else if (error()) {
+  <app-error-state title="Unable to load trace" [error]="error()" (retry)="load()" />
+} @else if (trace(); as t) {
+  <header class="card head">
+    <div class="row row--between">
+      <h2 class="mono">{{ t.trace_id }}</h2>
+      <div class="row">
+        <app-status-badge [status]="t.check_status" />
+        @if (t.refused) {
+          <app-status-badge [status]="t.refused_by ?? 'refused'" />
+        } @else {
+          <span class="badge badge--success">Answered</span>
+        }
+      </div>
+    </div>
+    <p class="question">{{ t.question }}</p>
+    <dl class="meta">
+      <dt>Recorded</dt>
+      <dd>{{ t.timestamp | date: 'medium' }}</dd>
+      <dt>Origin</dt>
+      <dd>{{ t.origin }}</dd>
+      <dt>Model</dt>
+      <dd class="mono">{{ t.model }}</dd>
+      <dt>Prompt</dt>
+      <dd class="mono">{{ t.prompt_version }}</dd>
+      <dt>Mode</dt>
+      <dd>{{ serverConfig.modeLabel(t.params['mode'] + '') }}</dd>
+      <dt>Chunking</dt>
+      <dd>{{ t.chunk_strategy ? serverConfig.strategyLabel(t.chunk_strategy) : '—' }}</dd>
+      <dt>Latency</dt>
+      <dd>{{ t.latency_ms | duration }}</dd>
+      <dt>Redacted</dt>
+      <dd>{{ t.identifiers_redacted }} identifier{{ t.identifiers_redacted === 1 ? '' : 's' }}</dd>
+    </dl>
+  </header>
+
+  <section class="card">
+    <div class="card__header"><span class="card__title">Quality checks</span></div>
+    <ul class="checks">
+      @for (check of t.checks; track check.id) {
+        <li class="check">
+          <app-status-badge [status]="check.status" />
+          <span>{{ check.name }}</span>
+          @if (check.detail) {
+            <span class="muted small">— {{ check.detail }}</span>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="card__header"><span class="card__title">Answer</span></div>
+    @if (t.answer) {
+      <div class="markdown" [innerHTML]="t.answer | markdown: t.retrieved.length"></div>
+    } @else {
+      <p class="muted small">No answer was generated.</p>
+    }
+    @if (t.invalid_citations.length) {
+      <p class="small" style="color: var(--danger)">Invented citations: {{ t.invalid_citations.join(', ') }}</p>
+    }
+    @if (t.raw_output && t.raw_output.trim() !== (t.answer ?? '').trim()) {
+      <details class="disclosure">
+        <summary>Raw model output</summary>
+        <pre class="small">{{ t.raw_output }}</pre>
+      </details>
+    }
+  </section>
+
+  <section class="card">
+    <div class="card__header">
+      <span class="card__title">Retrieved chunks ({{ t.retrieved.length }})</span>
+      <span class="small muted">gate {{ t.passes_gate ? 'passed' : 'blocked' }} at {{ minScore() }}</span>
+    </div>
+    <div class="stack">
+      @for (chunk of t.retrieved; track chunk.chunk_id) {
+        <app-chunk-card [chunk]="chunk" [gate]="minScore()" [cited]="citedIds().has(chunk.chunk_id)" [showDenseSeparately]="notCosine()" />
+      }
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card__header">
+      <span class="card__title">Parameters</span>
+    </div>
+    <pre class="small">{{ t.params | json }}</pre>
+  </section>
+
+  <section class="card replay">
+    <div class="card__header">
+      <span class="card__title">Replay</span>
+      <button type="button" class="btn btn--primary btn--sm" [disabled]="replaying()" (click)="runReplay()">
+        {{ replaying() ? 'Replaying…' : 'Replay this trace' }}
+      </button>
+    </div>
+    <p class="muted small">
+      Runs retrieval again with the recorded parameters, and regenerates the answer from the chunks stored in the trace.
+      If generation matches while retrieval does not, the index moved; if retrieval matches while generation does not, the model or prompt moved.
+    </p>
+
+    @if (replayError()) {
+      <app-error-state title="Replay failed" [error]="replayError()" (retry)="runReplay()" />
+    }
+
+    @if (replay(); as r) {
+      <div class="replay__grid">
+        <div>
+          <h3>
+            Retrieval
+            <span class="badge" [class.badge--success]="r.retrieval.identical" [class.badge--warning]="!r.retrieval.identical">
+              {{ r.retrieval.identical ? 'identical' : r.retrieval.same_chunks ? 'same chunks, scores differ' : 'different' }}
+            </span>
+          </h3>
+          <div class="replay__cols">
+            <ol class="replay__list">
+              <li class="faint small">original</li>
+              @for (hit of r.retrieval.original; track $index) {
+                <li class="mono small">{{ hit.chunk_id }} <span class="faint">{{ hit.score }}</span></li>
+              }
+            </ol>
+            <ol class="replay__list">
+              <li class="faint small">replayed</li>
+              @for (hit of r.retrieval.replayed; track $index) {
+                <li class="mono small" [class.changed]="r.retrieval.original[$index]?.chunk_id !== hit.chunk_id">
+                  {{ hit.chunk_id }} <span class="faint">{{ hit.score }}</span>
+                </li>
+              }
+            </ol>
+          </div>
+        </div>
+        <div>
+          <h3>
+            Generation
+            @if (r.generation?.skipped) {
+              <span class="badge">skipped</span>
+            } @else {
+              <span class="badge" [class.badge--success]="r.generation?.identical" [class.badge--warning]="!r.generation?.identical">
+                {{ r.generation?.identical ? 'identical' : 'different' }}
+              </span>
+            }
+          </h3>
+          @if (r.generation; as g) {
+            @if (g.skipped) {
+              <p class="muted small">{{ g.reason }}</p>
+            } @else if (g.identical) {
+              <p class="muted small">The model produced the same output from the same chunks (prompt {{ g.prompt_version_now }}).</p>
+            } @else {
+              <p class="muted small">Prompt then {{ g.prompt_version_then }} · now {{ g.prompt_version_now }}</p>
+              <pre class="diff small">@for (line of g.diff; track $index) {<span [class]="diffClass(line)">{{ line }}</span>
+}</pre>
+            }
+          }
+        </div>
+      </div>
+    }
+  </section>
+}

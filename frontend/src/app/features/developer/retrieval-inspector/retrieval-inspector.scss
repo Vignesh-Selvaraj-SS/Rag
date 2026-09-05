@@ -1,0 +1,67 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspector__controls {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.inspector__controls .field {
+  width: 120px;
+}
+
+.inspector__controls .field:first-child {
+  width: 220px;
+}
+
+.inspector__source {
+  flex: 1;
+  min-width: 200px;
+}
+
+.inspector__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.compare__col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compare__list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.compare__list li {
+  display: flex;
+  flex-direction: column;
+}
+
+.compare__source {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
