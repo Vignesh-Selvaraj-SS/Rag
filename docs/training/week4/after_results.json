@@ -1,0 +1,200 @@
+{
+  "mode": "hybrid",
+  "n_questions": 12,
+  "hit_rate_at_3": 0.9166666666666666,
+  "p50_latency_ms": 15.0,
+  "per_question": [
+    {
+      "id": "Q1",
+      "question": "What is the deductible for a water backup claim under endorsement HO-2026-01, and does it stack with the base all-perils deductible?",
+      "expected_chunk_id": "endorsement-HO-2026-01-water-backup.md::4",
+      "exact_token": "HO-2026-01",
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 29.8,
+      "top5_chunk_ids": [
+        "endorsement-HO-2026-01-water-backup.md::4",
+        "claims-adjuster-authority.md::3",
+        "endorsement-HO-2026-04-scheduled-property.md::3",
+        "policy-base-HO3-2026.md::7",
+        "endorsement-HO-2026-02-service-line.md::5"
+      ]
+    },
+    {
+      "id": "Q2",
+      "question": "Under endorsement HO-2026-02, exactly where does service line coverage begin and end?",
+      "expected_chunk_id": "endorsement-HO-2026-02-service-line.md::2",
+      "exact_token": "HO-2026-02",
+      "rank_of_expected": 4,
+      "hit_at_3": false,
+      "latency_ms": 11.6,
+      "top5_chunk_ids": [
+        "endorsement-HO-2026-02-service-line.md::0",
+        "endorsement-HO-2026-02-service-line.md::1",
+        "endorsement-HO-2026-02-service-line.md::6",
+        "endorsement-HO-2026-02-service-line.md::2",
+        "endorsement-HO-2026-02-service-line.md::5"
+      ]
+    },
+    {
+      "id": "Q3",
+      "question": "Under endorsement HO-2026-03, what settlement basis applies to covered equipment that is 10 years or older?",
+      "expected_chunk_id": "endorsement-HO-2026-03-equipment-breakdown.md::7",
+      "exact_token": "HO-2026-03",
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 13.7,
+      "top5_chunk_ids": [
+        "endorsement-HO-2026-03-equipment-breakdown.md::7",
+        "endorsement-HO-2026-03-equipment-breakdown.md::4",
+        "endorsement-HO-2026-03-equipment-breakdown.md::1",
+        "endorsement-HO-2026-04-scheduled-property.md::1",
+        "faq-policyholder-endorsements.md::10"
+      ]
+    },
+    {
+      "id": "Q4",
+      "question": "Which territories currently prohibit roof ACV settlement under endorsement HO-2026-08?",
+      "expected_chunk_id": "endorsement-HO-2026-08-roof-surfaces-acv.md::6",
+      "exact_token": "HO-2026-08",
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 13.9,
+      "top5_chunk_ids": [
+        "endorsement-HO-2026-08-roof-surfaces-acv.md::6",
+        "endorsement-HO-2026-08-roof-surfaces-acv.md::0",
+        "endorsement-HO-2026-08-roof-surfaces-acv.md::1",
+        "faq-policyholder-endorsements.md::7",
+        "endorsement-HO-2026-08-roof-surfaces-acv.md::7"
+      ]
+    },
+    {
+      "id": "Q5",
+      "question": "Under endorsement HO-2026-05, what is the time limit for actually completing repairs before increased ordinance-or-law costs stop being payable?",
+      "expected_chunk_id": "endorsement-HO-2026-05-ordinance-or-law.md::5",
+      "exact_token": "HO-2026-05",
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 18.5,
+      "top5_chunk_ids": [
+        "endorsement-HO-2026-05-ordinance-or-law.md::5",
+        "endorsement-HO-2026-02-service-line.md::4",
+        "endorsement-HO-2026-05-ordinance-or-law.md::0",
+        "endorsement-HO-2026-05-ordinance-or-law.md::3",
+        "endorsement-HO-2026-05-ordinance-or-law.md::1"
+      ]
+    },
+    {
+      "id": "Q6",
+      "question": "How many client visits per week are allowed for a home business to still qualify under endorsement HO-2026-06?",
+      "expected_chunk_id": "endorsement-HO-2026-06-home-business.md::2",
+      "exact_token": "HO-2026-06",
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 16.0,
+      "top5_chunk_ids": [
+        "endorsement-HO-2026-06-home-business.md::2",
+        "endorsement-HO-2026-06-home-business.md::0",
+        "faq-policyholder-endorsements.md::10",
+        "endorsement-HO-2026-06-home-business.md::1",
+        "faq-policyholder-endorsements.md::11"
+      ]
+    },
+    {
+      "id": "Q7",
+      "question": "Under endorsement HO-2026-07, is a ransomware payment reimbursed automatically, or are there conditions attached?",
+      "expected_chunk_id": "endorsement-HO-2026-07-identity-fraud.md::5",
+      "exact_token": "HO-2026-07",
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 18.1,
+      "top5_chunk_ids": [
+        "endorsement-HO-2026-07-identity-fraud.md::5",
+        "endorsement-HO-2026-07-identity-fraud.md::7",
+        "faq-policyholder-endorsements.md::9",
+        "endorsement-HO-2026-06-home-business.md::2",
+        "endorsement-HO-2026-07-identity-fraud.md::3"
+      ]
+    },
+    {
+      "id": "Q8",
+      "question": "Under endorsement HO-2026-04, how long does a policyholder have to claim back withheld depreciation after actually repairing or replacing the property?",
+      "expected_chunk_id": "endorsement-HO-2026-04-scheduled-property.md::1",
+      "exact_token": "HO-2026-04",
+      "rank_of_expected": 2,
+      "hit_at_3": true,
+      "latency_ms": 18.3,
+      "top5_chunk_ids": [
+        "faq-policyholder-endorsements.md::14",
+        "endorsement-HO-2026-04-scheduled-property.md::1",
+        "claims-adjuster-authority.md::3",
+        "endorsement-HO-2026-04-scheduled-property.md::6",
+        "policy-base-HO3-2026.md::9"
+      ]
+    },
+    {
+      "id": "Q9",
+      "question": "What is the reserve authority limit for a Senior field adjuster?",
+      "expected_chunk_id": "claims-adjuster-authority.md::1",
+      "exact_token": null,
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 12.3,
+      "top5_chunk_ids": [
+        "claims-adjuster-authority.md::1",
+        "claims-adjuster-authority.md::2",
+        "claims-fnol-procedure.md::4",
+        "claims-adjuster-authority.md::0",
+        "endorsement-HO-2026-05-ordinance-or-law.md::1"
+      ]
+    },
+    {
+      "id": "Q10",
+      "question": "How soon must a claim number be issued after First Notice of Loss, regardless of the channel it comes through?",
+      "expected_chunk_id": "claims-fnol-procedure.md::1",
+      "exact_token": null,
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 16.3,
+      "top5_chunk_ids": [
+        "claims-fnol-procedure.md::1",
+        "policy-base-HO3-2026.md::10",
+        "endorsement-HO-2026-02-service-line.md::7",
+        "claims-fnol-procedure.md::6",
+        "faq-policyholder-endorsements.md::12"
+      ]
+    },
+    {
+      "id": "Q11",
+      "question": "What emergency mitigation spend can an intake handler authorise without adjuster approval?",
+      "expected_chunk_id": "claims-fnol-procedure.md::4",
+      "exact_token": null,
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 13.8,
+      "top5_chunk_ids": [
+        "claims-fnol-procedure.md::4",
+        "faq-policyholder-endorsements.md::13",
+        "claims-fnol-procedure.md::5",
+        "claims-fnol-procedure.md::2",
+        "claims-adjuster-authority.md::1"
+      ]
+    },
+    {
+      "id": "Q12",
+      "question": "What reason code should be used when closing a duplicate claim number that was issued in error?",
+      "expected_chunk_id": "claims-fnol-procedure.md::6",
+      "exact_token": "DUP-01",
+      "rank_of_expected": 1,
+      "hit_at_3": true,
+      "latency_ms": 13.4,
+      "top5_chunk_ids": [
+        "claims-fnol-procedure.md::6",
+        "claims-fnol-procedure.md::1",
+        "claims-adjuster-authority.md::6",
+        "endorsement-HO-2026-05-ordinance-or-law.md::2",
+        "endorsement-HO-2026-07-identity-fraud.md::7"
+      ]
+    }
+  ]
+}

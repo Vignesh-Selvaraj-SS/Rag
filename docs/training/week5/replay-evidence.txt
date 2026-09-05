@@ -1,0 +1,44 @@
+seed          : 20260902
+frame         : 100 trace_ids
+trace_id      : t_0036
+recorded at   : 2026-09-02T18:06:13+00:00
+model         : openai/gpt-oss-20b
+prompt_version: v1
+params        : {"mode": "hybrid", "top_k": 5, "min_score": 0.6, "source_filter": null, "temperature": 0.0, "max_tokens": 800}
+question      : A service line failure was caused by a contractor. What does the subrogation procedure require, and does HO-2026-02 affect recovery?
+
+RETRIEVAL - original (from the trace)
+-------------------------------------
+  1. claims-adjuster-authority.md::6  score=0.0328
+  2. endorsement-HO-2026-02-service-line.md::1  score=0.0315
+  3. claims-procedure-cp12-subrogation.pdf::5  score=0.0315
+  4. endorsement-HO-2026-02-service-line.md::6  score=0.0313
+  5. claims-procedure-cp12-subrogation.pdf::2  score=0.0308
+
+RETRIEVAL - replayed
+--------------------
+  1. claims-adjuster-authority.md::6  score=0.0328
+  2. claims-procedure-cp12-subrogation.pdf::5  score=0.0315
+  3. endorsement-HO-2026-02-service-line.md::1  score=0.0315
+  4. endorsement-HO-2026-02-service-line.md::6  score=0.0313
+  5. claims-procedure-cp12-subrogation.pdf::2  score=0.0308
+
+retrieval identical: False
+
+GENERATION - original raw_output (from the trace)
+-------------------------------------------------
+For a contractor‑caused service line failure, subrogation must be evaluated on claims over $5,000 and a referral to the Recovery unit is mandatory within 5 business days [S1][S5]. The file must retain a failed‑component evidence log, all correspondence with the
+
+GENERATION - replayed raw_output
+--------------------------------
+For a contractor‑caused service line failure, subrogation must be evaluated on claims over $5,000 and a referral to the Recovery unit is required within 5 business days. The file must retain a failed‑component evidence log, all correspondence with the responsible party, and a final recovery reconciliation showing gross, legal, and net recovery [S1][S3][S5]. The HO‑2026‑02 endorsement provides coverage for the repair or replacement of the damaged line and excavation costs, but it does not change the subrogation procedure or the recovery timeline [S2].
+
+generation identical: False
+
+GENERATION - diff
+-----------------
+--- original
++++ replayed
+@@ -1 +1 @@
+-For a contractor‑caused service line failure, subrogation must be evaluated on claims over $5,000 and a referral to the Recovery unit is mandatory within 5 business days [S1][S5]. The file must retain a failed‑component evidence log, all correspondence with the
++For a contractor‑caused service line failure, subrogation must be evaluated on claims over $5,000 and a referral to the Recovery unit is required within 5 business days. The file must retain a failed‑component evidence log, all correspondence with the responsible party, and a final recovery reconciliation showing gross, legal, and net recovery [S1][S3][S5]. The HO‑2026‑02 endorsement provides coverage for the repair or replacement of the damaged line and excavation costs, but it does not change the subrogation procedure or the recovery timeline [S2].

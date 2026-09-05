@@ -1,0 +1,91 @@
+@let msg = message();
+
+@if (msg.role === 'user') {
+  <div class="message message--user">
+    <div class="message__bubble message__bubble--user">{{ msg.text }}</div>
+    <time class="message__time faint small" [dateTime]="msg.createdAt">{{ msg.createdAt | date: 'shortTime' }}</time>
+  </div>
+} @else {
+  <div class="message message--assistant">
+    <div class="message__avatar" aria-hidden="true">◈</div>
+    <div class="message__body">
+      @switch (msg.status) {
+        @case ('pending') {
+          <div class="message__bubble message__bubble--assistant">
+            <span class="typing" aria-label="Generating answer">
+              <span></span><span></span><span></span>
+            </span>
+            <span class="muted small">Searching documents and writing an answer…</span>
+          </div>
+        }
+        @case ('error') {
+          <app-error-state title="Could not answer" [error]="msg.error" (retry)="retry()" />
+        }
+        @case ('done') {
+          @if (response(); as res) {
+            <div
+              class="message__bubble message__bubble--assistant"
+              [class.message__bubble--refused]="res.refused"
+            >
+              <div class="markdown" (click)="onAnswerClick($event)" [innerHTML]="res.answer | markdown: sourceCount()"></div>
+            </div>
+
+            @if (res.refused) {
+              <p class="muted small message__note">
+                @if (res.refused_by === 'gate') {
+                  No document was similar enough to this question, so no answer was attempted.
+                } @else {
+                  The documents were searched but did not contain the answer.
+                }
+              </p>
+            }
+
+            @if (res.sources.length) {
+              <div class="sources">
+                <span class="sources__label">Sources</span>
+                @for (source of res.sources; track source.chunk_id) {
+                  <button
+                    type="button"
+                    class="source"
+                    [class.source--active]="highlightedSource() === source.rank"
+                    (click)="highlightedSource.set(highlightedSource() === source.rank ? null : source.rank)"
+                    [title]="source.source + ' › ' + source.heading"
+                  >
+                    <span class="source__tag mono">S{{ source.rank }}</span>
+                    <span class="source__name truncate">{{ source.source }}</span>
+                    <span class="source__where faint">› {{ source.heading }} · {{ source.page }}</span>
+                  </button>
+                }
+              </div>
+            } @else if (!res.refused) {
+              <p class="muted small message__note">No sources were cited for this answer.</p>
+            }
+
+            <div class="message__actions">
+              <button type="button" class="btn btn--ghost btn--sm" (click)="copy()">Copy</button>
+              <button type="button" class="btn btn--ghost btn--sm" [disabled]="busy()" (click)="regenerate()">Regenerate</button>
+              <span class="faint small message__meta">
+                {{ serverConfig.modeLabel(res.mode) }} · {{ res.latency_ms | duration }}
+                @if (res.trace_id && developerMode()) {
+                  · <span class="mono">{{ res.trace_id }}</span>
+                }
+              </span>
+              @if (developerMode() && res.debug) {
+                <button type="button" class="btn btn--ghost btn--sm" (click)="showDetails.set(!showDetails())">
+                  {{ showDetails() ? 'Hide details' : 'Details' }}
+                </button>
+              }
+            </div>
+
+            @if (developerMode() && res.debug && showDetails()) {
+              <app-retrieval-details
+                [response]="res"
+                [highlightedRank]="highlightedSource()"
+              />
+            }
+          }
+        }
+      }
+    </div>
+  </div>
+}

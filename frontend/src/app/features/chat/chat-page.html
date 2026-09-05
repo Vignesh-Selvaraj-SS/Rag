@@ -1,0 +1,51 @@
+<div class="chat">
+  <header class="chat__header">
+    <div>
+      <h1>Chat</h1>
+      <p class="muted small">
+        Answers come only from your indexed documents, with the file and page cited.
+        <span class="faint">Search: {{ modeLabel() }}</span>
+      </p>
+    </div>
+    @if (!store.isEmpty()) {
+      @if (clearConfirm()) {
+        <span class="row">
+          <span class="small muted">Clear the conversation?</span>
+          <button type="button" class="btn btn--sm btn--danger" (click)="clear()">Clear</button>
+          <button type="button" class="btn btn--sm btn--ghost" (click)="clearConfirm.set(false)">Keep</button>
+        </span>
+      } @else {
+        <button type="button" class="btn btn--sm btn--ghost" (click)="clearConfirm.set(true)">Clear conversation</button>
+      }
+    }
+  </header>
+
+  @if (llmMissing()) {
+    <div class="notice notice--warning">
+      Answer generation is not configured on the server (no model API key). Retrieval still works in the
+      <a routerLink="/developer/retrieval">Retrieval inspector</a>.
+    </div>
+  }
+
+  <div #feed class="chat__feed" aria-live="polite">
+    @if (store.isEmpty()) {
+      <app-empty-state
+        icon="💬"
+        title="Ask a question about your documents"
+        description="Try one of these, or type your own below."
+      >
+        <div class="samples">
+          @for (sample of samples; track sample) {
+            <button type="button" class="sample" (click)="send(sample)" [disabled]="store.isBusy()">{{ sample }}</button>
+          }
+        </div>
+      </app-empty-state>
+    } @else {
+      @for (message of store.messages(); track message.id) {
+        <app-chat-message [message]="message" />
+      }
+    }
+  </div>
+
+  <app-chat-composer class="chat__composer" [disabled]="store.isBusy()" (submitted)="send($event)" />
+</div>

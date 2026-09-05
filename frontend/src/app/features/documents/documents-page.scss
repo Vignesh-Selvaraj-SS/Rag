@@ -1,0 +1,82 @@
+.kb {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.kb__main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kb__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kb__icon {
+  font-size: 1.6rem;
+}
+
+.kb__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.stat__value--text {
+  font-size: 1rem;
+  padding-top: 4px;
+}
+
+.kb__rebuild {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.kb__rebuild .field {
+  min-width: 260px;
+  flex: 1;
+  max-width: 420px;
+}
+
+.upload-button--busy {
+  opacity: 0.8;
+}
+
+.dropzone {
+  border-radius: var(--radius);
+  transition: box-shadow 0.12s ease;
+}
+
+.dropzone--active {
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+.doc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.doc__ext {
+  text-transform: uppercase;
+  font-size: 0.68rem;
+}
+
+.doc__name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.drop-hint {
+  text-align: center;
+  margin-top: 8px;
+}

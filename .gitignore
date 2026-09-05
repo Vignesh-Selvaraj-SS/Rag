@@ -1,6 +1,25 @@
+# Python
 .venv/
-.qdrant/
-.qdrant_eval/
-.env
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# Secrets
+.env
+
+# Runtime data (vector index, traces, evaluation runs)
+.qdrant/
+.runtime/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

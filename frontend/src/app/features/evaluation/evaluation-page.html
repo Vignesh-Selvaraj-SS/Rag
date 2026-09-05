@@ -1,0 +1,331 @@
+<div class="page">
+  <app-page-header
+    title="Evaluation"
+    subtitle="Measure retrieval against a golden set of questions with known-correct chunks: hit-rate@3, hit-rate@5, MRR and latency."
+  >
+    <form class="run-form" [formGroup]="runForm" (ngSubmit)="runEvaluation()">
+      <select class="select" formControlName="mode" aria-label="Retrieval mode to evaluate">
+        @for (mode of serverConfig.modes(); track mode.id) {
+          <option [value]="mode.id" [disabled]="mode.requires_llm && !serverConfig.llmConfigured()">{{ mode.label }}</option>
+        }
+      </select>
+      <input class="input run-form__label" type="text" formControlName="label" placeholder="Label (optional)" maxlength="80" />
+      <button type="submit" class="btn btn--primary" [disabled]="running() || questions.length === 0">
+        {{ running() ? 'Running…' : 'Run evaluation' }}
+      </button>
+    </form>
+  </app-page-header>
+
+  @if (runError()) {
+    <app-error-state title="Evaluation could not run" [error]="runError()" (retry)="runEvaluation()" />
+  }
+
+  <nav class="tabs" aria-label="Evaluation sections">
+    <button type="button" class="tab" [class.active]="tab() === 'results'" (click)="tab.set('results')">Results</button>
+    <button type="button" class="tab" [class.active]="tab() === 'questions'" (click)="tab.set('questions')">
+      Golden set ({{ questions.length }})
+    </button>
+    <button type="button" class="tab" [class.active]="tab() === 'history'" (click)="tab.set('history')">History ({{ runs().length }})</button>
+  </nav>
+
+  <!-- ================================================================ results -->
+  @if (tab() === 'results') {
+    @if (selectedRunLoading()) {
+      <app-loading-indicator message="Loading run…" />
+    } @else if (!selectedRun()) {
+      @if (runsLoading()) {
+        <app-loading-indicator message="Loading evaluations…" />
+      } @else if (runsError()) {
+        <app-error-state title="Unable to load evaluations" [error]="runsError()" (retry)="loadRuns()" />
+      } @else {
+        <app-empty-state
+          icon="🎯"
+          title="No evaluation yet"
+          [description]="questions.length ? 'Choose a retrieval mode above and run the golden set against the current index.' : 'Add golden-set questions first, then run an evaluation.'"
+        >
+          @if (!questions.length) {
+            <button type="button" class="btn btn--primary" (click)="addQuestion()">Add a question</button>
+          }
+        </app-empty-state>
+      }
+    } @else if (selectedRun(); as run) {
+      @for (warning of run.warnings; track warning) {
+        <div class="notice notice--warning">{{ warning }}</div>
+      }
+
+      <div class="row row--between">
+        <div>
+          <h2>
+            {{ run.label || serverConfig.modeLabel(run.mode) }}
+            <span class="badge badge--accent">{{ serverConfig.modeLabel(run.mode) }}</span>
+          </h2>
+          <p class="muted small">
+            {{ run.created_at | date: 'medium' }} · {{ run.n_questions }} questions · index: {{ run.index.chunks ?? '?' }} chunks,
+            {{ run.index.strategy ? serverConfig.strategyLabel(run.index.strategy) : 'unknown strategy' }}
+            @if (previousRun(); as prev) {
+              · compared with {{ prev.label || serverConfig.modeLabel(prev.mode) }} ({{ prev.created_at | relativeTime }})
+            }
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid--stats">
+        <div class="stat">
+          <span class="stat__label">Hit-rate@3</span>
+          <span class="stat__value">{{ run.hit_rate_at_3 | percent: '1.0-0' }}</span>
+          <span class="stat__hint">
+            {{ run.hits_at_3 }}/{{ run.n_questions }}
+            @if (delta(run.hit_rate_at_3, previousRun()?.hit_rate_at_3); as d) {
+              <span [class]="d > 0 ? 'delta delta--up' : d < 0 ? 'delta delta--down' : 'delta'">{{ d > 0 ? '+' : '' }}{{ d | percent: '1.0-0' }}</span>
+            }
+          </span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Hit-rate@5</span>
+          <span class="stat__value">{{ run.hit_rate_at_5 | percent: '1.0-0' }}</span>
+          <span class="stat__hint">{{ run.hits_at_5 }}/{{ run.n_questions }} · the app shows top-{{ serverConfig.defaults().top_k }}</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">MRR</span>
+          <span class="stat__value">{{ run.mrr | number: '1.2-2' }}</span>
+          <span class="stat__hint">mean reciprocal rank</span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">p50 latency</span>
+          <span class="stat__value">{{ run.p50_latency_ms | duration }}</span>
+          <span class="stat__hint">
+            retrieval only
+            @if (previousRun(); as prev) {
+              · was {{ prev.p50_latency_ms | duration }}
+            }
+          </span>
+        </div>
+        <div class="stat">
+          <span class="stat__label">Misses</span>
+          <span class="stat__value">{{ failures().length }}</span>
+          <span class="stat__hint">expected chunk outside top-3</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Question</th>
+              <th>Expected chunk</th>
+              <th class="num">Rank</th>
+              <th class="num">Latency</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (q of run.per_question; track q.id) {
+              <tr [class.miss]="!q.hit_at_3">
+                <td><app-status-badge [status]="q.hit_at_3 ? 'hit' : 'miss'" [label]="q.hit_at_3 ? 'Hit' : 'Miss'" /></td>
+                <td>
+                  <div class="q">
+                    <span class="mono faint">{{ q.id }}</span>
+                    <span>{{ q.question }}</span>
+                    @if (q.exact_token) {
+                      <span class="badge" title="Exact identifier the question depends on">{{ q.exact_token }}</span>
+                    }
+                  </div>
+                </td>
+                <td class="mono small">{{ q.expected_chunk_id }}</td>
+                <td class="num mono">{{ q.rank_of_expected ?? '>' + run.top_k }}</td>
+                <td class="num">{{ q.latency_ms | duration }}</td>
+                <td class="num nowrap">
+                  <button type="button" class="btn btn--ghost btn--sm" (click)="toggleQuestion(q.id)">
+                    {{ expandedQuestion() === q.id ? 'Hide' : 'Top hits' }}
+                  </button>
+                  <button type="button" class="btn btn--ghost btn--sm" (click)="inspect(q.id)" [disabled]="!serverConfig.llmConfigured()" title="Run the full pipeline and compare the answer with what was retrieved">
+                    Inspect
+                  </button>
+                </td>
+              </tr>
+              @if (expandedQuestion() === q.id) {
+                <tr class="expanded">
+                  <td colspan="6">
+                    <ol class="hits">
+                      @for (hit of q.top_hits; track hit.chunk_id) {
+                        <li [class.hits__expected]="hit.expected">
+                          <span class="mono">{{ hit.rank }}.</span>
+                          <span class="mono">{{ hit.chunk_id }}</span>
+                          <span class="muted">{{ hit.heading }}</span>
+                          <span class="mono faint">score {{ hit.score | number: '1.3-4' }} · sim {{ hit.dense_score | number: '1.3-3' }}</span>
+                          @if (hit.expected) {
+                            <span class="badge badge--success">expected</span>
+                          }
+                        </li>
+                      }
+                    </ol>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  <!-- ============================================================= golden set -->
+  @if (tab() === 'questions') {
+    @if (goldenLoading()) {
+      <app-loading-indicator message="Loading golden set…" />
+    } @else if (goldenError()) {
+      <app-error-state title="Unable to load the golden set" [error]="goldenError()" (retry)="loadGoldenSet()" />
+    } @else {
+      <div class="row row--between">
+        <p class="muted small">
+          Each question names the chunk id that should be retrieved (file name, two colons, chunk index - see the retrieval inspector). Ids are stable for a given document and chunking strategy.
+        </p>
+        <div class="row">
+          <button type="button" class="btn" (click)="addQuestion()">Add question</button>
+          <button type="button" class="btn btn--primary" [disabled]="!goldenDirty() || goldenSaving()" (click)="saveGoldenSet()">
+            {{ goldenSaving() ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
+      </div>
+
+      @if (!questions.length) {
+        <app-empty-state icon="📝" title="The golden set is empty" description="Add a question with the chunk you expect it to retrieve.">
+          <button type="button" class="btn btn--primary" (click)="addQuestion()">Add a question</button>
+        </app-empty-state>
+      } @else {
+        <div class="table-wrap">
+          <table class="table golden">
+            <thead>
+              <tr>
+                <th style="width: 90px">Id</th>
+                <th>Question</th>
+                <th style="width: 26%">Expected chunk id</th>
+                <th style="width: 16%">Heading</th>
+                <th style="width: 110px">Token</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (group of questionControls; track group; let i = $index) {
+                <tr [formGroup]="group">
+                  <td><input class="input" formControlName="id" aria-label="Question id" (input)="markDirty()" /></td>
+                  <td><textarea class="textarea golden__question" rows="2" formControlName="question" aria-label="Question" (input)="markDirty()"></textarea></td>
+                  <td><input class="input mono" formControlName="expected_chunk_id" placeholder="file.md::4" aria-label="Expected chunk id" (input)="markDirty()" /></td>
+                  <td><input class="input" formControlName="expected_heading" aria-label="Expected heading" (input)="markDirty()" /></td>
+                  <td><input class="input mono" formControlName="exact_token" placeholder="HO-2026-01" aria-label="Exact token" (input)="markDirty()" /></td>
+                  <td class="num"><button type="button" class="btn btn--ghost btn--sm" aria-label="Remove question" (click)="removeQuestion(i)">✕</button></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
+
+  <!-- ================================================================ history -->
+  @if (tab() === 'history') {
+    @if (runsLoading()) {
+      <app-loading-indicator message="Loading evaluations…" />
+    } @else if (runsError()) {
+      <app-error-state title="Unable to load evaluations" [error]="runsError()" (retry)="loadRuns()" />
+    } @else if (!runs().length) {
+      <app-empty-state icon="🕒" title="No evaluation runs yet" description="Every run is kept so retrieval changes can be compared before and after." />
+    } @else {
+      <div class="table-wrap">
+        <table class="table table--clickable">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Label</th>
+              <th>Mode</th>
+              <th>Index</th>
+              <th class="num">Hit@3</th>
+              <th class="num">Hit@5</th>
+              <th class="num">MRR</th>
+              <th class="num">p50</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (run of runs(); track run.run_id) {
+              <tr (click)="selectRun(run.run_id)" [class.selected]="selectedRun()?.run_id === run.run_id">
+                <td class="nowrap">{{ run.created_at | date: 'MMM d, HH:mm' }}</td>
+                <td>{{ run.label ?? '—' }}</td>
+                <td>{{ serverConfig.modeLabel(run.mode) }}</td>
+                <td class="small muted">{{ run.index.chunks ?? '?' }} chunks · {{ run.index.strategy ?? '?' }}</td>
+                <td class="num">{{ run.hit_rate_at_3 | percent: '1.0-0' }}</td>
+                <td class="num">{{ run.hit_rate_at_5 | percent: '1.0-0' }}</td>
+                <td class="num">{{ run.mrr | number: '1.2-2' }}</td>
+                <td class="num">{{ run.p50_latency_ms | duration }}</td>
+                <td class="num">
+                  <button type="button" class="btn btn--ghost btn--sm" aria-label="Delete run" (click)="$event.stopPropagation(); pendingDeleteRun.set(run)">✕</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>
+
+<!-- ================================================================ inspect -->
+@if (inspecting(); as questionId) {
+  <div class="overlay" (click)="closeInspect()">
+    <div class="sheet card" role="dialog" aria-modal="true" aria-labelledby="inspect-title" (click)="$event.stopPropagation()">
+      <div class="row row--between">
+        <h2 id="inspect-title">Inspect {{ questionId }}</h2>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="closeInspect()">Close</button>
+      </div>
+      @if (inspectError()) {
+        <app-error-state title="Inspection failed" [error]="inspectError()" (retry)="inspect(questionId)" />
+      } @else if (!inspection()) {
+        <app-loading-indicator message="Retrieving and generating an answer…" />
+      } @else if (inspection(); as result) {
+        <p class="q-text">{{ result.question }}</p>
+        <div class="row">
+          <span class="badge" [class.badge--success]="result.expected_was_shown" [class.badge--danger]="!result.expected_was_shown">
+            expected chunk {{ result.expected_was_shown ? 'was shown to the model' : 'NOT shown to the model' }}
+          </span>
+          @if (result.refused) {
+            <app-status-badge [status]="result.refused_by ?? 'refused'" />
+          }
+          @if (result.invalid_citations.length) {
+            <span class="badge badge--danger">invented: {{ result.invalid_citations.join(', ') }}</span>
+          }
+          <span class="small muted">{{ result.latency_ms | duration }}</span>
+        </div>
+        <p class="small muted">
+          Label the failure with evidence: if the expected chunk is missing below it is a <strong>retrieval</strong> failure;
+          if it is present but the answer is wrong, the <strong>model</strong> misused good context.
+        </p>
+        <h3>Answer</h3>
+        <div class="card markdown" [innerHTML]="result.answer | markdown: result.retrieved.length"></div>
+        <h3>Retrieved ({{ result.retrieved.length }})</h3>
+        <div class="stack">
+          @for (chunk of result.retrieved; track chunk.chunk_id) {
+            <app-chunk-card
+              [chunk]="chunk"
+              [expected]="chunk.expected"
+              [cited]="result.cited_chunk_ids.includes(chunk.chunk_id)"
+              [gate]="serverConfig.defaults().min_score"
+              [showDenseSeparately]="result.mode === 'hybrid' || result.mode === 'rerank'"
+            />
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<app-confirm-dialog
+  [open]="pendingDeleteRun() !== null"
+  title="Delete evaluation run?"
+  message="The run's results will be removed permanently."
+  confirmLabel="Delete"
+  [destructive]="true"
+  (confirmed)="confirmDeleteRun()"
+  (cancelled)="pendingDeleteRun.set(null)"
+/>

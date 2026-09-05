@@ -1,0 +1,93 @@
+<form class="card inspector" [formGroup]="form" (ngSubmit)="search()">
+  <div class="field">
+    <label class="field__label" for="q">Question</label>
+    <textarea id="q" class="textarea" rows="2" formControlName="question" placeholder="What deductible applies to a water backup claim?"></textarea>
+  </div>
+  <div class="inspector__controls">
+    <div class="field">
+      <label class="field__label" for="mode">Mode</label>
+      <select id="mode" class="select" formControlName="mode">
+        @for (mode of serverConfig.modes(); track mode.id) {
+          <option [value]="mode.id" [disabled]="mode.requires_llm && !serverConfig.llmConfigured()">{{ mode.label }}</option>
+        }
+      </select>
+    </div>
+    <div class="field">
+      <label class="field__label" for="topK">Top-k</label>
+      <input id="topK" class="input" type="number" min="1" max="50" formControlName="topK" />
+    </div>
+    <div class="field">
+      <label class="field__label" for="minScore">Gate</label>
+      <input id="minScore" class="input" type="number" min="0" max="1" step="0.01" formControlName="minScore" [placeholder]="serverConfig.defaults().min_score" />
+    </div>
+    <div class="field inspector__source">
+      <label class="field__label" for="source">Source filter</label>
+      <input id="source" class="input" type="text" formControlName="source" placeholder="file name (optional)" />
+    </div>
+    <div class="inspector__actions">
+      <button type="submit" class="btn btn--primary" [disabled]="loading() || form.invalid">{{ loading() ? 'Searching…' : 'Search' }}</button>
+      <button type="button" class="btn" [disabled]="comparing() || form.controls.question.invalid" (click)="compareAll()">
+        {{ comparing() ? 'Comparing…' : 'Compare all modes' }}
+      </button>
+    </div>
+  </div>
+</form>
+
+@if (error()) {
+  <app-error-state title="Search failed" [error]="error()" (retry)="search()" />
+}
+
+@if (loading()) {
+  <app-loading-indicator message="Searching…" />
+} @else if (result(); as res) {
+  <section class="stack">
+    <div class="row">
+      <span class="badge" [class.badge--success]="res.passes_gate" [class.badge--warning]="!res.passes_gate">
+        gate {{ res.passes_gate ? 'passes' : 'blocks' }} at {{ res.min_score }}
+      </span>
+      <span class="small muted">best score <span class="mono">{{ res.best_score }}</span></span>
+      <span class="small muted">{{ res.hits.length }} chunks · {{ res.latency_ms | duration }} · {{ serverConfig.modeLabel(res.mode) }}</span>
+      @if (notCosine()) {
+        <span class="small faint">rank score is {{ res.mode === 'hybrid' ? 'fused RRF' : 'cross-encoder' }}; the gate uses cosine similarity</span>
+      }
+    </div>
+    @if (!res.hits.length) {
+      <app-empty-state icon="🔍" title="No chunks matched" description="Check the source filter, or rebuild the index." />
+    }
+    @for (hit of res.hits; track hit.chunk_id) {
+      <app-chunk-card [chunk]="hit" [gate]="res.min_score" [showDenseSeparately]="notCosine()" />
+    }
+  </section>
+} @else if (!compare()) {
+  <app-empty-state
+    icon="🔍"
+    title="Inspect retrieval"
+    description="See exactly which chunks a question surfaces, in what order, and whether the similarity gate would let it through - without generating an answer."
+  />
+}
+
+@if (comparing()) {
+  <app-loading-indicator message="Running every mode…" />
+} @else if (compare()) {
+  <section class="compare">
+    @for (entry of compareEntries(); track entry.mode) {
+      <div class="card compare__col">
+        <h3>{{ serverConfig.modeLabel(entry.mode) }}</h3>
+        @if (asError(entry.value); as err) {
+          <p class="small" style="color: var(--danger)">{{ err.message }}</p>
+        } @else if (asResponse(entry.value); as res) {
+          <p class="small muted">{{ res.latency_ms | duration }} · gate {{ res.passes_gate ? 'passes' : 'blocks' }}</p>
+          <ol class="compare__list">
+            @for (hit of res.hits; track hit.chunk_id) {
+              <li>
+                <span class="compare__source">{{ hit.source }}</span>
+                <span class="muted small">{{ hit.heading }}</span>
+                <span class="mono faint small">sim {{ hit.dense_score }}</span>
+              </li>
+            }
+          </ol>
+        }
+      </div>
+    }
+  </section>
+}

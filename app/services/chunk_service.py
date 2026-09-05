@@ -69,40 +69,51 @@ def create_chunks(document: dict) -> list[dict]:
     heading to the next. No size budget, no merging/splitting, no
     overlap - a chunk is exactly what the document's own structure
     says it is.
+
+    Falls back to fixed-size windows when NO heading at all is
+    detected. A document with zero recognisable structure - e.g. a
+    real PDF numbered as plain "12. Title" with no markdown "#" and
+    no SECTION/ARTICLE keyword, which the heading regex deliberately
+    doesn't match (that form is indistinguishable from a numbered
+    list item without breaking the guard against treating list items
+    as headings) - would otherwise collapse into one enormous chunk
+    whose embedding is too diluted to ever rank well against
+    properly-chunked documents. Confirmed against a real uploaded
+    50-page PDF: 0 headings detected, whole document as 1 chunk,
+    invisible to retrieval for any of its own specific topics.
     """
 
     full_text = document["text"]
 
-    offsets = _build_page_offsets(document["pages"])
-
     matches = list(HEADING_PATTERN.finditer(full_text))
 
     if not matches:
-        sections = [{"heading": "Overview", "text": full_text.strip(), "start": 0}]
+        return create_fixed_size_chunks(document)
 
-    else:
-        sections = []
+    offsets = _build_page_offsets(document["pages"])
 
-        if matches[0].start() > 0:
-            preamble = full_text[:matches[0].start()].strip()
-            if preamble:
-                sections.append({"heading": "Overview", "text": preamble, "start": 0})
+    sections = []
 
-        for index, match in enumerate(matches):
+    if matches[0].start() > 0:
+        preamble = full_text[:matches[0].start()].strip()
+        if preamble:
+            sections.append({"heading": "Overview", "text": preamble, "start": 0})
 
-            heading = (
-                match.group("md")
-                or match.group("keyword")
-                or match.group("numbered")
-                or "Section"
-            ).strip()
+    for index, match in enumerate(matches):
 
-            start = match.end()
-            end = matches[index + 1].start() if index + 1 < len(matches) else len(full_text)
-            body = full_text[start:end].strip()
+        heading = (
+            match.group("md")
+            or match.group("keyword")
+            or match.group("numbered")
+            or "Section"
+        ).strip()
 
-            if body:
-                sections.append({"heading": heading, "text": body, "start": start})
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(full_text)
+        body = full_text[start:end].strip()
+
+        if body:
+            sections.append({"heading": heading, "text": body, "start": start})
 
     chunks = []
 

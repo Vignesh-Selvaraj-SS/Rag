@@ -1,0 +1,162 @@
+<div class="page page--narrow">
+  <app-page-header title="Settings" subtitle="Preferences are stored in this browser. Server configuration is read-only here." />
+
+  @if (redirectedFromDeveloper()) {
+    <div class="notice notice--info">Developer tools are hidden until Developer mode is switched on below.</div>
+  }
+
+  <!-- Appearance & developer -->
+  <section class="card stack">
+    <h2>General</h2>
+
+    <div class="setting">
+      <div>
+        <div class="setting__label">Developer mode</div>
+        <p class="muted small">Shows retrieval details under each answer, technical error details, and the Developer section (retrieval inspector, traces, replay).</p>
+      </div>
+      <button
+        type="button"
+        class="switch"
+        role="switch"
+        [attr.aria-checked]="preferences.developerMode()"
+        aria-label="Developer mode"
+        (click)="toggleDeveloper()"
+      ></button>
+    </div>
+
+    <div class="setting">
+      <div>
+        <div class="setting__label">Theme</div>
+        <p class="muted small">Follow the system, or force light or dark.</p>
+      </div>
+      <div class="segmented" role="radiogroup" aria-label="Theme">
+        @for (option of ['system', 'light', 'dark']; track option) {
+          <button
+            type="button"
+            role="radio"
+            [attr.aria-checked]="preferences.theme() === option"
+            class="segmented__option"
+            [class.segmented__option--active]="preferences.theme() === option"
+            (click)="setTheme(option === 'system' ? 'system' : option === 'light' ? 'light' : 'dark')"
+          >
+            {{ option | titlecase }}
+          </button>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Retrieval -->
+  <form class="card stack" [formGroup]="form" (ngSubmit)="save()">
+    <div class="row row--between">
+      <h2>Retrieval</h2>
+      @if (preferences.hasRetrievalOverrides() || preferences.mode() !== 'dense') {
+        <span class="badge badge--accent">customised</span>
+      }
+    </div>
+    <p class="muted small">How questions are matched to document chunks. Applies to every question you ask from this browser.</p>
+
+    <div class="field">
+      <label class="field__label" for="mode">Search mode</label>
+      <select id="mode" class="select" formControlName="mode">
+        @for (mode of serverConfig.modes(); track mode.id) {
+          <option [value]="mode.id" [disabled]="mode.requires_llm && !serverConfig.llmConfigured()">
+            {{ mode.label }}{{ mode.requires_llm && !serverConfig.llmConfigured() ? ' (needs model key)' : '' }}
+          </option>
+        }
+      </select>
+      @if (selectedMode(); as mode) {
+        <span class="field__hint">{{ mode.description }}</span>
+      }
+    </div>
+
+    <details class="disclosure advanced" [open]="preferences.hasRetrievalOverrides()">
+      <summary>Advanced RAG configuration</summary>
+      <div class="advanced__body">
+        <p class="muted small">
+          Leave a field empty to use the server default
+          (top-k {{ serverConfig.defaults().top_k }}, minimum similarity {{ serverConfig.defaults().min_score }}).
+        </p>
+        <div class="grid grid--2">
+          <div class="field">
+            <label class="field__label" for="topK">Top-k chunks</label>
+            <input id="topK" class="input" type="number" min="1" max="50" step="1" formControlName="topK" [placeholder]="serverConfig.defaults().top_k" />
+            <span class="field__hint">How many chunks are shown to the model. Measured: recall stops improving after 5.</span>
+            @if (form.controls.topK.invalid && form.controls.topK.touched) {
+              <span class="field__error">Enter a whole number between 1 and 50.</span>
+            }
+          </div>
+          <div class="field">
+            <label class="field__label" for="minScore">Minimum similarity (gate)</label>
+            <input id="minScore" class="input" type="number" min="0" max="1" step="0.01" formControlName="minScore" [placeholder]="serverConfig.defaults().min_score" />
+            <span class="field__hint">Questions whose best chunk scores below this are refused without a model call.</span>
+            @if (form.controls.minScore.invalid && form.controls.minScore.touched) {
+              <span class="field__error">Enter a value between 0 and 1.</span>
+            }
+          </div>
+        </div>
+        <div class="field">
+          <label class="field__label" for="source">Restrict to one document</label>
+          <input id="source" class="input" type="text" formControlName="source" placeholder="e.g. policy-base-HO3-2026.md" />
+          <span class="field__hint">Exact file name. Only chunks from that document are searched.</span>
+        </div>
+      </div>
+    </details>
+
+    <div class="row">
+      <button type="submit" class="btn btn--primary" [disabled]="form.invalid">Save</button>
+      <button type="button" class="btn btn--ghost" (click)="reset()">Reset to defaults</button>
+    </div>
+  </form>
+
+  <!-- Server -->
+  <section class="card stack">
+    <h2>Server configuration</h2>
+    @if (serverConfig.error(); as error) {
+      <app-error-state title="Unable to load server configuration" [error]="error" (retry)="serverConfig.load(true)" />
+    } @else if (serverConfig.settings(); as s) {
+      <dl class="kv">
+        <dt>Answer model</dt>
+        <dd>
+          <span class="mono">{{ s.generation.model }}</span>
+          @if (!s.generation.configured) {
+            <span class="badge badge--danger">API key not set</span>
+          }
+        </dd>
+        <dt>Temperature / max tokens</dt>
+        <dd class="mono">{{ s.generation.temperature }} / {{ s.generation.max_tokens }}</dd>
+        <dt>Prompt version</dt>
+        <dd class="mono">{{ s.generation.prompt_version }}</dd>
+        <dt>Embedding model</dt>
+        <dd class="mono">{{ s.embedding_model }}</dd>
+        <dt>Collection</dt>
+        <dd class="mono">{{ s.collection }}</dd>
+        <dt>Default top-k / gate</dt>
+        <dd class="mono">{{ s.defaults.top_k }} / {{ s.defaults.min_score }}</dd>
+        <dt>Reranker</dt>
+        <dd class="mono">{{ s.constants.reranker_model }} over {{ s.constants.candidate_pool_size }} candidates</dd>
+        <dt>Hybrid fusion</dt>
+        <dd class="mono">RRF k = {{ s.constants.rrf_k }}</dd>
+        <dt>MMR λ</dt>
+        <dd class="mono">{{ s.constants.mmr_lambda }}</dd>
+        <dt>Fixed-size chunking</dt>
+        <dd class="mono">{{ s.constants.fixed_chunk_words }} words, {{ s.constants.fixed_chunk_overlap_words }} overlap</dd>
+        <dt>HNSW</dt>
+        <dd class="mono">m {{ s.constants.hnsw_m }} · ef_construct {{ s.constants.hnsw_ef_construct }} · ef_search {{ s.constants.hnsw_ef_search }}</dd>
+        <dt>Traces</dt>
+        <dd>{{ s.traces_enabled ? 'Recorded for every question (identifiers redacted)' : 'Disabled' }}</dd>
+        <dt>Upload limit</dt>
+        <dd>{{ s.max_upload_mb }} MB · {{ s.supported_extensions.join(', ') }}</dd>
+        <dt>API version</dt>
+        <dd class="mono">{{ s.version }}</dd>
+      </dl>
+      <p class="faint small">These values come from the server's environment (<span class="mono">.env</span>) and can only be changed there.</p>
+    } @else {
+      <p class="muted small">Loading…</p>
+    }
+  </section>
+
+  @if (preferences.developerMode()) {
+    <p class="small muted">Developer tools: <a routerLink="/developer/retrieval">Retrieval inspector</a> · <a routerLink="/developer/traces">Traces</a></p>
+  }
+</div>

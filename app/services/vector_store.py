@@ -45,6 +45,10 @@ class VectorStore:
 
         self.client = client or QdrantClient(path=settings.QDRANT_PATH)
 
+        # Lazily built, cached until the next rebuild_index() - see
+        # search_hybrid() and hybrid_search.BM25Index.
+        self._bm25_index = None
+
     def rebuild_index(self, chunks: list[dict], batch_size: int = 128) -> int:
         """
         Wipe the collection and store these chunks from scratch, so
@@ -99,6 +103,8 @@ class VectorStore:
                 ],
             )
 
+        self._bm25_index = None  # invalidate - rebuilt lazily on next hybrid search
+
         return self.count()
 
     def count(self) -> int:
@@ -146,3 +152,65 @@ class VectorStore:
             {**(point.payload or {}), "score": float(point.score)}
             for point in response.points
         ]
+
+    def get_all_chunks(self) -> list[dict]:
+        """
+        Every stored chunk's payload, unranked - used to build the
+        BM25 index for hybrid search so it always reflects whatever
+        was last ingested, whichever chunking strategy produced it.
+        """
+
+        if not self.client.collection_exists(self.collection_name):
+            return []
+
+        points, _ = self.client.scroll(
+            collection_name=self.collection_name,
+            limit=100_000,
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        return [point.payload for point in points]
+
+    def search_hybrid(
+        self,
+        query_embedding: list[float],
+        question: str,
+        top_k: int,
+        source: str | None = None,
+    ) -> list[dict]:
+        """
+        Dense search fused with BM25 keyword search via Reciprocal
+        Rank Fusion (k=60) - see app/services/hybrid_search.py. Measured
+        in docs/training/week4/results.md before being wired in here.
+        """
+
+        from app.services.hybrid_search import BM25Index, fuse_with_rrf
+
+        if self._bm25_index is None:
+            self._bm25_index = BM25Index(self.get_all_chunks())
+
+        # Dense ranking over the WHOLE collection, so RRF has a full
+        # rank position for every chunk dense search "knows about" -
+        # not just the usual top_k window.
+        dense_results = self.search(
+            query_embedding=query_embedding,
+            top_k=self.count(),
+            source=source,
+        )
+
+        bm25_rank = self._bm25_index.rank(question)
+
+        if source:
+            bm25_rank = {
+                chunk_id: rank
+                for chunk_id, rank in bm25_rank.items()
+                if self._bm25_index.chunk_by_id[chunk_id]["source"] == source
+            }
+
+        return fuse_with_rrf(
+            dense_results,
+            bm25_rank,
+            self._bm25_index.chunk_by_id,
+            top_k=top_k,
+        )

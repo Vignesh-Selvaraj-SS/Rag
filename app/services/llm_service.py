@@ -1,8 +1,12 @@
+import logging
 import re
 
-from groq import Groq
+from groq import Groq, GroqError
 
 from app.core.config import settings
+from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
+
+logger = logging.getLogger(__name__)
 
 REFUSAL_MESSAGE = "I don't know - the documents provided don't cover this."
 
@@ -11,6 +15,11 @@ REFUSAL_MESSAGE = "I don't know - the documents provided don't cover this."
 # would want to change per deployment. The token cap just bounds cost.
 TEMPERATURE = 0.0
 MAX_TOKENS = 800
+
+# Bump this whenever SYSTEM_PROMPT or the user prompt below changes. A trace
+# that records the version can be replayed later even once the prompt has
+# moved on; a trace without one is only replayable by luck.
+PROMPT_VERSION = "v1"
 
 SYSTEM_PROMPT = f"""
 You are a claims documentation assistant for Meridian Mutual.
@@ -51,10 +60,7 @@ class LLMService:
     def generate_answer(self, question: str, hits: list[dict]) -> dict:
 
         if self.client is None:
-            raise RuntimeError(
-                "GROQ_API_KEY is not set. Copy .env.example to .env and "
-                "add your key from https://console.groq.com/keys"
-            )
+            raise LLMNotConfiguredError()
 
         sources = "\n\n".join(
             f"[S{number}] file: {hit['source']} | "
@@ -69,23 +75,23 @@ class LLMService:
             f'If the answer is not there, reply exactly: "{REFUSAL_MESSAGE}"'
         )
 
-        response = self.client.chat.completions.create(
-            model=settings.MODEL_NAME,
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
-            messages=[
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=settings.MODEL_NAME,
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+        except GroqError as error:
+            logger.warning("Groq call failed: %s: %s", type(error).__name__, error)
+            raise LLMUpstreamError() from error
 
-        text = (response.choices[0].message.content or "").strip()
+        raw_output = response.choices[0].message.content or ""
+
+        text = raw_output.strip()
 
         # Verify citations against what was actually given - never trust
         # a [S#] tag the model emits without checking it's in range.
@@ -112,4 +118,10 @@ class LLMService:
             "cited": cited,
             "invalid_citations": invalid,
             "refused": refused,
+            # Kept separate from "answer" so a trace records what the model
+            # actually emitted, not just what survived parsing.
+            "raw_output": raw_output,
+            "prompt_version": PROMPT_VERSION,
+            "temperature": TEMPERATURE,
+            "max_tokens": MAX_TOKENS,
         }
