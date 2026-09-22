@@ -1,10 +1,10 @@
 import logging
-import re
 
 from groq import Groq, GroqError
 
 from app.core.config import settings
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
+from app.services.citations import CITATION_PARSER_VERSION, parse_citations
 
 logger = logging.getLogger(__name__)
 
@@ -95,18 +95,7 @@ class LLMService:
 
         # Verify citations against what was actually given - never trust
         # a [S#] tag the model emits without checking it's in range.
-        cited = []
-        invalid = []
-
-        for tag in re.findall(r"\[S(\d+)\]", text):
-
-            number = int(tag)
-
-            if 1 <= number <= len(hits):
-                if number not in cited:
-                    cited.append(number)
-            else:
-                invalid.append(f"[S{tag}]")
+        cited, invalid = parse_citations(text, len(hits))
 
         refused = (
             REFUSAL_MESSAGE.lower() in text.lower()
@@ -122,6 +111,7 @@ class LLMService:
             # actually emitted, not just what survived parsing.
             "raw_output": raw_output,
             "prompt_version": PROMPT_VERSION,
+            "citation_parser_version": CITATION_PARSER_VERSION,
             "temperature": TEMPERATURE,
             "max_tokens": MAX_TOKENS,
         }
