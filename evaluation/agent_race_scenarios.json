@@ -1,0 +1,38 @@
+[
+  {
+    "id": "S1",
+    "complexity": "simple",
+    "claim": "What is the deductible for a water backup claim under endorsement HO-2026-01?",
+    "expected_keywords": ["$500"]
+  },
+  {
+    "id": "S2",
+    "complexity": "simple",
+    "claim": "What is the deductible for an identity fraud claim under endorsement HO-2026-07?",
+    "expected_keywords": ["$250"]
+  },
+  {
+    "id": "S3",
+    "complexity": "simple",
+    "claim": "Does a deductible apply to a lost scheduled item under endorsement HO-2026-04?",
+    "expected_keywords": ["no deductible"]
+  },
+  {
+    "id": "C1",
+    "complexity": "complex",
+    "claim": "A contractor severed a buried water service line while doing landscaping work, and the claim is covered under endorsement HO-2026-02. What deductible applies, and what does the subrogation procedure CP-12 require for a contractor-caused failure like this?",
+    "expected_keywords": ["$500", "5 business days"]
+  },
+  {
+    "id": "C2",
+    "complexity": "complex",
+    "claim": "A senior field adjuster wants to settle a $120,000 water backup claim under endorsement HO-2026-01. What deductible applies, and is $120,000 within that adjuster's personal settlement authority?",
+    "expected_keywords": ["$500", "$150,000"]
+  },
+  {
+    "id": "C3",
+    "complexity": "complex",
+    "claim": "A roof claim under endorsement HO-2026-08 is being denied in part because of fire damage, not wind or hail. Does the ACV restriction actually apply to fire damage, and what does CP-09 require before a denial letter can be issued?",
+    "expected_keywords": ["wind", "hail", "10 business days"]
+  }
+]
