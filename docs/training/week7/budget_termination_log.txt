@@ -1,0 +1,21 @@
+Budget-termination demo: CLM-2007, max_iterations=2 (deliberately tight - this claim normally needs 4-5 turns)
+==============================================================================
+
+Step 1: get_claim
+  args:   {'claim_id': 'CLM-2007'}
+  result: {'result': {'claim_id': 'CLM-2007', 'claimed_amount': 120000, 'policy_form': 'HO-3-2026 + HO-2026-08 (roof surfaces ACV)', 'adjuster_notes': "House fire started in the attic and destroyed the roof structure and surfacing. Cause of loss confirmed as fire by the fire department report, not wind or hai
+  tokens: 957, latency: 508ms
+
+Step 2: search_policy
+  args:   {'query': 'HO-2026-08', 'top_k': 5}
+  result: {'result': [{'source': 'endorsement-HO-2026-05-ordinance-or-law.md', 'heading': 'Endorsement HO-2026-05 — Increased Ordinance or Law Coverage', 'page': 'p.1', 'score': 0.719, 'text': '**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $31 annual at the 25% option, $74 a
+  tokens: 1422, latency: 1194ms
+
+------------------------------------------------------------------------------
+stopped_reason : iteration_limit
+finished       : False
+steps taken    : 2 (budget was 2)
+decision       : None
+payout         : None
+
+The budget fired cleanly: the loop stopped after exactly 2 iterations with stopped_reason='iteration_limit' and finished=False, rather than spinning past the budget or silently returning a partial answer dressed up as a real decision.
