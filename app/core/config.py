@@ -70,6 +70,20 @@ class Settings(BaseSettings):
         return self.RUNTIME_DIR / "evaluations"
 
     @property
+    def eval_set_path(self) -> Path:
+        """The Week 6 answer-quality test set, scored by scripts/run_evals.py."""
+        return self.EVALUATION_DIR / "eval_set.jsonl"
+
+    @property
+    def eval_runs_dir(self) -> Path:
+        return self.RUNTIME_DIR / "evals"
+
+    @property
+    def judge_dir(self) -> Path:
+        """Judge validation artefacts: generated summaries and grading sheets."""
+        return self.RUNTIME_DIR / "judge"
+
+    @property
     def traces_path(self) -> Path:
         return self.RUNTIME_DIR / "traces.jsonl"
 

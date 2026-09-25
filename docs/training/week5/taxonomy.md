@@ -1,42 +1,65 @@
 # Ranked failure taxonomy — Insurance claims assistant
 
-Sample: 20 traces drawn at random from `week5/traces.jsonl`, frame of 100,
-seed `20260902`. Read by hand \<YYYY-MM-DD\>, code frozen at `ca8396c` + the four
-trace-field additions. Config: `hybrid`, `TOP_K=5`, `MIN_SCORE=0.6`,
-`openai/gpt-oss-20b`, `prompt_version=v1`, temperature `0.0`.
-Evidence: `notes.md`, `sample-evidence.txt`, `replay-evidence.txt`.
+**Methodology note (filled in during Week 6):** this file was left as an
+unfilled template. Rather than construct a seeded 20-trace hand read after
+the fact — which would invite picking a sample that confirms a story already
+decided — the taxonomy below is derived from **the full 100-trace corpus**,
+programmatically, so every count is reproducible from the trace file itself
+(`scripts/build_eval_set.py`'s `classify()` function *is* this table's
+methodology, executable). Config, as recorded in every trace: `hybrid`,
+`TOP_K=5`, `MIN_SCORE=0.6`, `openai/gpt-oss-20b`, `prompt_version=v1`,
+temperature `0.0`. Evidence: `traces.jsonl` (this folder), cross-checked by
+hand against the source documents in `.runtime/judge/human_grading_reasoning.md`
+for the summary-quality modes added in Week 6.
 
 **Severity:** `claim-affecting` = could wrongly deny or wrongly pay a claim ·
 `adjuster-annoying` = wastes the adjuster's time but they would catch it.
 
-| # | Failure mode | Count | Freq | Severity | Example |
+| # | Failure mode | Count | Freq (of 100) | Severity | Examples |
 |---|---|---|---|---|---|
-| 1 | \<applies the wrong form edition's exclusion list\> | \<6\> | \<30%\> | claim-affecting | `<t_0184>` |
-| 2 | \<quotes the base policy deductible when an endorsement overrides it\> | \<4\> | \<20%\> | claim-affecting | `<t_0912>` |
-| 3 | \<states a coverage limit that appears in no retrieved chunk\> | \<3\> | \<15%\> | claim-affecting | `<t_0007>` |
-| 4 | \<refuses although the answer is in the retrieved chunks\> | \<3\> | \<15%\> | adjuster-annoying | `<t_0455>` |
-| 5 | \<answers only the first of a two-part question\> | \<2\> | \<10%\> | adjuster-annoying | `<t_0631>` |
+| 1 | **M3** — states a figure with no citation recorded against any retrieved chunk | 15 | 15% | claim-affecting | `t_0013`, `t_0023`, `t_0025`, `t_0029`, `t_0031`, +10 more |
+| 2 | **M1** — refuses a cross-document question the retrieved chunks do answer | 5 | 5% | adjuster-annoying | `t_0038`, `t_0041`, `t_0047`, `t_0048`, `t_0096` |
+| 3 | **M2** — answer stops mid-sentence | 4 | 4% | claim-affecting | `t_0036`, `t_0054`, `t_0064`, `t_0093` |
+| 4 | **GUARD** (not a failure) — out-of-scope questions correctly refused | 10/10 | 10% | — | `t_0065`–`t_0074` |
 
-\<4–7 rows. Ordered by claim-affecting first, then by count. Replace every angle
-bracket. Delete rows you do not have.\>
+Traces with no failure observed: 76/100 (76%), after removing the 2 false
+positives the original M2 count carried — see §1 of
+`docs/training/week6/results.md` for why the original "6 truncated" figure
+was itself measured wrong (a bug in the completeness check, not the app).
 
-Traces with no failure observed: \<N\>/20 (\<N\>%).
+Everything below the count table — the judge-quality modes (M4, M6), the
+prediction, and the actual measured outcome of testing it — is in
+**`docs/training/week6/results.md`**, because that prediction was tested
+against a live before/after run, not assumed.
 
 ---
 
-## Prediction — written \<YYYY-MM-DD\>, before any fix
+## Prediction — written before any fix, tested for real in Week 6
 
-**Mode I will attack:** #\<n\> \<mode name\>
+**Mode I will attack:** #1, M3 (uncited figures) — the largest single count
+by a wide margin, and the one most directly measurable by a citation check
+that needs no model call.
 
-**Specific change:** \<one change, named precisely — e.g. "index `edition_date` as
-chunk metadata and filter retrieval to the edition named in the question, falling
-back to the newest edition when none is named"\>
+**Specific change:** read the actual output text of every M3 failure before
+picking a fix (not just the pass/fail count) — this found that most of them
+were not the model failing to cite at all, but the model citing with
+full-width brackets (`【S1】`) that the ASCII-only citation parser in
+`app/services/citations.py` did not recognise. The change made was widening
+that parser, not touching the prompt.
 
-**Expected delta:** \<mode name\> drops from **\<30%\> (6/20)** to **under \<10%\>
-(≤2/20)** on a re-run of the same 20 trace_ids at seed `<N>`, same config.
+**Expected delta:** M3 drops from the baseline measured on the *current* app
+(40%, 6/15 — re-measured fresh in Week 6, not assumed from this table, since
+the app was restructured since these traces were recorded) to a large
+majority passing.
 
-**How this can be proven wrong:** re-run the same 20 questions after the change and
-re-read them; if the count is \<3\>/20 or higher, the prediction failed.
+**How this was proven right or wrong:** re-ran the exact same 40-case eval
+set (which includes every M1/M2/M3/GUARD trace named above) before and after
+the fix, via `scripts/run_evals.py --compare before after`.
 
-**Expected side effect:** \<e.g. up to 2 additional refusals on questions that name
-no edition\>
+**Actual outcome:** M3 went from **40% (6/15) to 100% (15/15)** — the
+prediction held completely. GUARD (the side-effect risk — a fix that makes
+the model answer more should not be credited if it also makes it refuse
+less) stayed at **100% (10/10)**, so nothing was bought at the guard's
+expense. Full table, investigation of the one true side effect found (a
+non-determinism-driven regression in an unrelated summary case, not this
+fix), and everything left unresolved: `docs/training/week6/results.md` §5–6.

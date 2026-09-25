@@ -1,0 +1,127 @@
+[
+  {
+    "id": "V01",
+    "notes": "Claim CLM-2026-02011, date of loss 2026-01-09. Sump pump failed during heavy rain in a finished basement built 2016, no battery backup or water alarm installed. Water backed up through the floor drain, damaging drywall and flooring. Endorsement HO-2026-01 attached. What is the coverage position and the deductible?",
+    "expect": "Covered but at the reduced $2,500 limit (backup system required for post-2020 finished basements, not fitted), deductible $500 replacing the base deductible."
+  },
+  {
+    "id": "V02",
+    "notes": "Claim CLM-2026-02033, date of loss 2026-01-22. A hair salon operated from home, four clients per day by appointment, no walk-ins, no employees on site. Endorsement HO-2026-06 attached. Confirm whether this qualifies as a home business and what liability limit applies.",
+    "expect": "Qualifies (within the visit/employee limits in the corpus); Part 2 liability limit $500,000 per occurrence / $1,000,000 aggregate."
+  },
+  {
+    "id": "V03",
+    "notes": "Claim CLM-2026-02058, date of loss 2026-02-03. Insured's home-sharing guest slipped on the front steps and broke an ankle. No endorsement HO-2026-06 on file. Confirm whether this liability claim is covered under the base policy alone.",
+    "expect": "Should flag this needs the base policy's own liability terms and the home-sharing exclusion, not invent a limit HO-2026-06 would have supplied since it is not attached."
+  },
+  {
+    "id": "V04",
+    "notes": "Claim CLM-2026-02077, date of loss 2026-02-15. A central air conditioning compressor failed, unit is 6 years old. Endorsement HO-2026-03 attached. State the settlement basis and the deductible.",
+    "expect": "Replacement cost (unit under 10 years old), $500 deductible, in place of the base all-perils deductible."
+  },
+  {
+    "id": "V05",
+    "notes": "Claim CLM-2026-02098, date of loss 2026-03-01. A roof damaged by hail, asphalt shingles installed 3 years ago, risk located in territory 41. Endorsement HO-2026-08 was applied at binding. Set out the coverage position.",
+    "expect": "Should flag the endorsement may not apply here: roof under 5 years old AND territory 41 both independently bar it; ACV settlement may be required instead, and the file needs review of whether HO-2026-08 was validly attached."
+  },
+  {
+    "id": "V06",
+    "notes": "Claim CLM-2026-02114, date of loss 2026-03-19. Increased ordinance-or-law costs are being claimed for a rebuild; repairs were completed 8 months after the loss. Endorsement HO-2026-05, 50% option elected. State whether the increased costs are still payable.",
+    "expect": "Depends on the specific time limit stated in the endorsement's Time Limit section for completing repairs; must be checked against that figure, not assumed."
+  },
+  {
+    "id": "V07",
+    "notes": "Claim CLM-2026-02140, date of loss 2026-04-02. Insured's credit card was fraudulently opened; a $1,800 identity-recovery legal fee and $600 in lost wages were incurred. Endorsement HO-2026-07 attached, police report filed. What is the coverage position and deductible?",
+    "expect": "Covered under HO-2026-07, $250 deductible, expense reimbursement up to whatever the corpus limit is (should not invent a figure not in the sources)."
+  },
+  {
+    "id": "V08",
+    "notes": "Claim CLM-2026-02166, date of loss 2026-04-20. A scheduled bracelet, appraised and listed under HO-2026-04, lost while insured was on vacation. What deductible applies and what is the settlement basis?",
+    "expect": "No deductible applies to scheduled items; base all-perils deductible does not apply either. Settlement basis should reference the schedule."
+  },
+  {
+    "id": "V09",
+    "notes": "Claim CLM-2026-02189, date of loss 2026-05-03. A contractor accidentally severed a buried water service line while doing landscaping work, causing the line to fail. HO-2026-02 attached. What does the subrogation procedure (CP-12) require, and does the endorsement affect recovery?",
+    "expect": "Subrogation evaluation required on claims above $5,000, referral to the Recovery unit within 5 business days per CP-12; HO-2026-02 covers the repair but does not change the recovery procedure."
+  },
+  {
+    "id": "V10",
+    "notes": "Claim CLM-2026-02205, date of loss 2026-05-18. Reserve was first set 4 business days after FNOL; the file shows no reserve update recorded in the 45 days since. What does CP-09 require here, and is the file compliant?",
+    "expect": "Should identify two breaches: initial reserve should be within 2 business days (missed), and a reserve update is required at minimum every 30 days (missed at 45 days) - flagged in the file audit standards."
+  },
+  {
+    "id": "V11",
+    "notes": "Claim CLM-2026-02230, date of loss 2026-06-01. Roof claim under HO-2026-08 will be denied in part because depreciation was applied before the deductible. The adjuster wants to know what CP-09 requires before issuing the denial letter.",
+    "expect": "Written denial letter quoting exact policy/endorsement wording, identifying the specific paragraph, stating the appeal route and time limit and the regulator's contact details, issued within 10 business days of the coverage decision - and it should flag that depreciation before deductible is itself the audit-standard error, not a valid basis for a partial denial."
+  },
+  {
+    "id": "V12",
+    "notes": "Claim CLM-2026-02255, date of loss 2026-06-14. A senior field adjuster wants to settle a claim for an amount inside their personal authority but the reserve on file is below the settlement amount. What does CP-09 require?",
+    "expect": "Authority applies to total incurred, not payment alone; the reserve inconsistency should be flagged and the settlement checked against the adjuster's authority tier, not approved on the payment figure alone."
+  },
+  {
+    "id": "V13",
+    "notes": "Claim CLM-2026-02278, date of loss 2026-07-02. Basement flooded from a sump pump failure and a chest freezer in the same basement lost its contents from the outage. Endorsements HO-2026-01 and HO-2026-03 both attached. Which endorsement responds to which loss?",
+    "expect": "Water backup (HO-2026-01) responds to the flood damage; equipment breakdown (HO-2026-03) responds to the freezer failure if it was a mechanical breakdown, each with its own deductible - should not conflate the two into one deductible."
+  },
+  {
+    "id": "V14",
+    "notes": "Claim CLM-2026-02301, date of loss 2026-07-19. Insured asks how much they will be reimbursed for their home business's lost income while the shop was closed for repairs after a covered fire. Endorsement HO-2026-06 attached.",
+    "expect": "Should reference the Business income section of HO-2026-06 for the figure, or state it is not established in the sources if the exact business-income limit is not in the retrieved chunks - must not invent a number."
+  },
+  {
+    "id": "V15",
+    "notes": "Claim CLM-2026-02322, date of loss 2026-08-05. What is the surrender value of the insured's annuity, and how much life insurance should they carry given this claim?",
+    "expect": "Entirely out of scope for a homeowners endorsement pack; the summary should state plainly that the sources do not cover this rather than attempting an answer."
+  },
+  {
+    "id": "V16",
+    "notes": "Claim CLM-2026-02348, date of loss 2026-08-21. A dedicated design consultant runs a home-based interior design practice, seeing four clients per week on site by appointment. Endorsement HO-2026-06 attached. Client tripped over a rug in the home office. Confirm the liability position.",
+    "expect": "Should flag that design/consulting professional services are excluded from Part 2 liability and require a separate professional policy, even though the endorsement is attached and the visit count otherwise qualifies."
+  },
+  {
+    "id": "V17",
+    "notes": "Claim CLM-2026-02366, date of loss 2026-09-01. Home-sharing guest's car was broken into in the insured's driveway while renting a room under a home-sharing platform. Endorsement HO-2026-06, Part 3 attached. What is the coverage position?",
+    "expect": "Should check whether Part 3 home-sharing coverage extends to guest property/vehicle break-ins or only to guest liability and property-damage-by-guest scenarios; if sources do not settle it, say so rather than guessing."
+  },
+  {
+    "id": "V18",
+    "notes": "Claim CLM-2026-02390, date of loss 2026-09-14. Insured wants increased ordinance-or-law costs for asbestos abatement required by the rebuild permit. Endorsement HO-2026-05, 25% option elected.",
+    "expect": "Should check the endorsement's 'Costs not covered' list for anything matching environmental/hazardous-material remediation before confirming coverage, rather than assuming all rebuild-related costs are payable."
+  },
+  {
+    "id": "V19",
+    "notes": "Claim CLM-2026-02411, date of loss 2026-10-02. A claims adjuster proposes splitting a $42,000 water damage loss into two separate $21,000 payments so it falls within their personal settlement authority. Is this permitted under CP-09?",
+    "expect": "Explicitly prohibited - splitting a loss into multiple claims or payments to stay within authority is a disciplinary matter per CP-09, detected by the weekly authority-breach report; the summary must flag this clearly, not merely describe the authority tiers."
+  },
+  {
+    "id": "V20",
+    "notes": "Claim CLM-2026-02435, date of loss 2026-10-20. Scheduled property claim for a lost watch; the adjuster wants to know if the base all-perils deductible should also be applied on top of the schedule's own terms.",
+    "expect": "No - scheduled property under HO-2026-04 carries no deductible at all, and CP-09 is explicit that the base deductible is not layered onto the endorsement portion."
+  },
+  {
+    "id": "V21",
+    "notes": "Claim CLM-2026-02460, date of loss 2026-11-03. Insured's accounts were compromised by ransomware; a specialist negotiator was engaged and $4,200 was spent on negotiation and specialist fees before the ransom question was resolved. Endorsement HO-2026-07 attached. State the coverage position.",
+    "expect": "The $4,200 falls under the separate 'cyber extortion negotiation and specialist fees' sub-limit of $5,000, distinct from the ransomware payment sub-limit - should not be confused with or capped against the $25,000 aggregate alone without naming the specific sub-limit."
+  },
+  {
+    "id": "V22",
+    "notes": "Claim CLM-2026-02478, date of loss 2026-11-15. One earring from a scheduled pair of diamond earrings (appraised together, listed as a set under HO-2026-04) was lost. The insured wants the full appraised value of the pair paid out.",
+    "expect": "Should flag that pairs and sets are settled on a loss-of-value-to-the-set basis, not by paying the full appraised value of the set for the loss of one article - paying the full pair value would be a claim-affecting overpayment."
+  },
+  {
+    "id": "V23",
+    "notes": "Claim CLM-2026-02491, date of loss 2026-11-22. A kitchen fire spread to the roof, destroying a section of asphalt shingle roofing installed 9 years ago. Endorsement HO-2026-08 is attached. State the settlement basis for the roof damage.",
+    "expect": "Replacement cost, not actual cash value - HO-2026-08's ACV restriction applies only to windstorm or hail causes of loss; fire-caused roof damage continues to settle at full replacement cost under the base form regardless of roof age."
+  },
+  {
+    "id": "V24",
+    "notes": "Claim CLM-2026-02505, date of loss 2026-12-01. A slow drain-line leak under the kitchen floor was discovered by the insured after roughly three weeks of gradual water intrusion; the insured had not noticed it while it was occurring. Endorsement HO-2026-01 attached. State the coverage position.",
+    "expect": "Excluded - continuous or repeated seepage over a period of more than 14 days is excluded under HO-2026-01 regardless of whether the insured was aware of it at the time; should not be summarised as a covered water backup event."
+  },
+  {
+    "id": "V25",
+    "notes": "Claim CLM-2026-02519, date of loss 2026-12-10. The adjuster issued the first indemnity payment on the claim, then sent the reservation-of-rights letter to the insured two weeks later, after coverage questions arose. Does this comply with CP-09?",
+    "expect": "No - CP-09's file audit standards list 'reservation of rights issued after the first payment rather than before' as a named audit failure; the summary should flag this as a compliance breach, not describe it as a normal sequence of steps."
+  }
+]

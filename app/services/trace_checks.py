@@ -13,7 +13,11 @@ Recovered from the Week 6 assertions module (A5-A8), whose source was lost;
 the behaviour is re-implemented from the documented criteria.
 """
 
-TERMINAL_ENDINGS = (".", "!", "?", '"', "”", ")", "]", "*")
+# A sentence may legitimately end on the closing bracket of a citation tag,
+# so every bracket the citation parser accepts counts as a terminal ending.
+# Without the full-width forms this check reports a false truncation on any
+# answer whose last token is a citation - measured on 2 of 100 Week 5 traces.
+TERMINAL_ENDINGS = (".", "!", "?", '"', "”", ")", "]", "*", "】", "］")
 
 
 def check_output_complete(trace: dict) -> dict:

@@ -11,9 +11,12 @@ from functools import lru_cache
 
 from app.core.config import settings
 from app.services.document_service import DocumentService
+from app.services.eval_service import EvalService
 from app.services.evaluation_service import EvaluationService
 from app.services.index_metadata import IndexMetadata
+from app.services.judge_service import JudgeService
 from app.services.rag_service import RAGService
+from app.services.summary_service import SummaryService
 from app.services.trace_service import TraceService
 
 
@@ -46,4 +49,22 @@ def get_evaluation_service() -> EvaluationService:
     return EvaluationService(
         golden_set_path=settings.golden_set_path,
         runs_dir=settings.evaluation_runs_dir,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_summary_service() -> SummaryService:
+    return SummaryService(rag_service=get_rag_service())
+
+
+@lru_cache(maxsize=1)
+def get_judge_service() -> JudgeService:
+    return JudgeService()
+
+
+@lru_cache(maxsize=1)
+def get_eval_service() -> EvalService:
+    return EvalService(
+        eval_set_path=settings.eval_set_path,
+        runs_dir=settings.eval_runs_dir,
     )
