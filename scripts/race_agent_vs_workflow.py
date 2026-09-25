@@ -19,6 +19,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+from app.core.errors import AppError  # noqa: E402
 from app.services.agent_service import ClaimAgent  # noqa: E402
 from app.services.fixed_claim_workflow import FixedClaimWorkflow  # noqa: E402
 from app.services.retrieval_service import RetrievalService  # noqa: E402
@@ -41,43 +42,53 @@ def score_reliability(answer: str, expected_keywords: list[str]) -> tuple[int, i
     return found, len(expected_keywords)
 
 
+def _run_system(run_fn, claim: str, expected_keywords: list[str]) -> dict:
+    """
+    Runs one system on one scenario, isolating a hard upstream failure (e.g.
+    Groq's daily token cap, live-observed hitting mid-race) to this one
+    system/scenario cell instead of losing the whole race. Mirrors
+    scripts/race_triage.py's _run_system, added after this exact script
+    crashed on a real live run rather than reporting a partial result.
+    """
+
+    try:
+        result = run_fn(claim)
+    except AppError as error:
+        return {
+            "answer": None, "sources": [], "steps": [], "step_count": 0,
+            "tokens_used": 0, "latency_ms": 0, "stopped_reason": "error",
+            "finished": False, "keywords_found": 0,
+            "keywords_total": len(expected_keywords), "error": str(error),
+        }
+
+    found, total = score_reliability(result["answer"] or "", expected_keywords)
+
+    return {
+        "answer": result["answer"],
+        "sources": result["sources"],
+        "steps": result["steps"],
+        "step_count": result["step_count"],
+        "tokens_used": result["tokens_used"],
+        "latency_ms": result["latency_ms"],
+        "stopped_reason": result.get("stopped_reason", "finished"),
+        "finished": result["finished"],
+        "keywords_found": found,
+        "keywords_total": total,
+    }
+
+
 def run_scenario(scenario: dict, agent: ClaimAgent, workflow: FixedClaimWorkflow) -> dict:
 
     claim = scenario["claim"]
-
-    agent_result = agent.run(claim)
-    workflow_result = workflow.run(claim)
-
-    agent_found, total = score_reliability(agent_result["answer"] or "", scenario["expected_keywords"])
-    workflow_found, _ = score_reliability(workflow_result["answer"] or "", scenario["expected_keywords"])
+    expected_keywords = scenario["expected_keywords"]
 
     return {
         "id": scenario["id"],
         "complexity": scenario["complexity"],
         "claim": claim,
-        "expected_keywords": scenario["expected_keywords"],
-        "agent": {
-            "answer": agent_result["answer"],
-            "sources": agent_result["sources"],
-            "steps": agent_result["steps"],
-            "step_count": agent_result["step_count"],
-            "tokens_used": agent_result["tokens_used"],
-            "latency_ms": agent_result["latency_ms"],
-            "stopped_reason": agent_result["stopped_reason"],
-            "finished": agent_result["finished"],
-            "keywords_found": agent_found,
-            "keywords_total": total,
-        },
-        "workflow": {
-            "answer": workflow_result["answer"],
-            "sources": workflow_result["sources"],
-            "steps": workflow_result["steps"],
-            "step_count": workflow_result["step_count"],
-            "tokens_used": workflow_result["tokens_used"],
-            "latency_ms": workflow_result["latency_ms"],
-            "keywords_found": workflow_found,
-            "keywords_total": total,
-        },
+        "expected_keywords": expected_keywords,
+        "agent": _run_system(agent.run, claim, expected_keywords),
+        "workflow": _run_system(workflow.run, claim, expected_keywords),
     }
 
 
@@ -117,6 +128,16 @@ def main() -> int:
         results.append(result)
         print(f" done ({time.perf_counter() - started:.1f}s)")
 
+        # Saved after every scenario, not just at the end - a hard upstream
+        # failure (Groq's daily token cap, live-observed mid-race) no longer
+        # loses every scenario run before it.
+        RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        RESULTS_PATH.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    if not results:
+        print("No scenarios completed.")
+        return 1
+
     print()
     header = f"{'id':<5}{'complexity':<11}{'agent steps':>12}{'agent tok':>11}{'agent ms':>10}{'agent rel':>11}{'fixed tok':>11}{'fixed ms':>10}{'fixed rel':>11}"
     print(header)
@@ -143,8 +164,6 @@ def main() -> int:
     print(f"totals: agent {total_agent_tokens} tok, {total_agent_ms}ms, {agent_rel}/{total_keywords} facts covered")
     print(f"        fixed {total_workflow_tokens} tok, {total_workflow_ms}ms, {workflow_rel}/{total_keywords} facts covered")
 
-    RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    RESULTS_PATH.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nSaved: {RESULTS_PATH.relative_to(REPO_ROOT)}")
 
     return 0

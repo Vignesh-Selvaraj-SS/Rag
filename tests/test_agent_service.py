@@ -179,6 +179,20 @@ def test_search_policy_reports_no_hits_cleanly():
     assert "No chunks found" in result["result"]
 
 
+def test_search_policy_resolves_a_guessed_endorsement_code_to_the_real_file_name():
+
+    # Regression test: found live running the Task Set D triage extension -
+    # the model reliably guesses source="HO-2026-01" (the endorsement code
+    # it already knows) rather than the real file name, and an exact-match
+    # filter then returns zero hits, burning a step on a search that should
+    # have worked.
+    retriever = _FakeRetriever()
+
+    search_policy(retriever, {"query": "x", "source": "HO-2026-01"})
+
+    assert retriever.calls[0]["source"] == "endorsement-HO-2026-01-water-backup.md"
+
+
 def test_list_documents_lists_supported_files_and_skips_hidden_ones(tmp_path, monkeypatch):
 
     (tmp_path / "policy.md").write_text("x", encoding="utf-8")

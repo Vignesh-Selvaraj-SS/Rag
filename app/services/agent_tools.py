@@ -29,6 +29,38 @@ from app.services.retrieval_service import RetrievalService
 SNIPPET_CHARS = 1200
 
 
+def _resolve_source(source: str | None) -> str | None:
+    """
+    Live bug, found running the Task Set D triage extension: the model
+    reliably guesses a `source` from the endorsement code or policy form it
+    already knows (e.g. "HO-2026-01") rather than the real file name
+    ("endorsement-HO-2026-01-water-backup.md"), no matter how the tool
+    description tells it not to - and an exact-match filter then returns
+    zero hits, burning a step on a search that should have worked. Resolving
+    a case-insensitive substring match against the real file names fixes
+    this without relying on prompt compliance. Falls back to the value
+    given, unchanged, when nothing matches (including in tests, which use
+    file names like "a.md" that were never meant to resolve against the
+    real corpus) or when the corpus can't be listed.
+    """
+
+    if not source or not settings.DATA_DIR.exists():
+        return source
+
+    names = [
+        path.name for path in settings.DATA_DIR.iterdir()
+        if path.is_file() and not path.name.startswith(".") and path.suffix.lower() in SUPPORTED_EXTENSIONS
+    ]
+
+    if source in names:
+        return source
+
+    needle = source.lower()
+    matches = [name for name in names if needle in name.lower()]
+
+    return matches[0] if len(matches) == 1 else source
+
+
 def search_policy(retriever: RetrievalService, args: dict) -> dict:
     """
     Search the indexed policy documents. Optionally scoped to one file name
@@ -41,7 +73,7 @@ def search_policy(retriever: RetrievalService, args: dict) -> dict:
     if not query:
         return {"error": "search_policy needs a non-empty 'query'."}
 
-    source = args.get("source") or None
+    source = _resolve_source(args.get("source") or None)
     top_k = int(args.get("top_k") or 5)
     top_k = max(1, min(top_k, 10))
 
