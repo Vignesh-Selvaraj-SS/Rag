@@ -28,14 +28,9 @@ export const routes: Routes = [
         loadComponent: () => import('./features/analytics/analytics-page').then((m) => m.AnalyticsPage),
       },
       {
-        path: 'triage',
-        title: 'Claims Triage · RAG Assistant',
-        loadComponent: () => import('./features/triage/triage-page').then((m) => m.TriagePage),
-      },
-      {
-        path: 'ask-agent',
-        title: 'Ask the Agent · RAG Assistant',
-        loadComponent: () => import('./features/policy-qa/policy-qa-page').then((m) => m.PolicyQaPage),
+        path: 'agent',
+        title: 'Agent · RAG Assistant',
+        loadComponent: () => import('./features/agent/agent-page').then((m) => m.AgentPage),
       },
       {
         path: 'settings',

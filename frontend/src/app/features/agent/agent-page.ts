@@ -1,32 +1,39 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import { ApiError, TriageClaimSummary, TriageRunResponse, TriageSystemResult } from '../../core/models';
-import { TriageApiService } from '../../core/services/triage-api.service';
+import { AgentClaimSummary, AgentRunResponse, AgentStep, AgentSystemChoice, ApiError } from '../../core/models';
+import { AgentApiService } from '../../core/services/agent-api.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { EmptyState } from '../../shared/components/empty-state/empty-state';
 import { ErrorState } from '../../shared/components/error-state/error-state';
 import { LoadingIndicator } from '../../shared/components/loading-indicator/loading-indicator';
 import { PageHeader } from '../../shared/components/page-header/page-header';
 
+export const SAMPLE_QUESTIONS = [
+  'What is the deductible for a water backup claim under HO-2026-01?',
+  'Is a dented metal roof covered under HO-2026-08?',
+  'A contractor severed a buried water service line - what does subrogation procedure CP-12 require?',
+];
+
 @Component({
-  selector: 'app-triage-page',
+  selector: 'app-agent-page',
   imports: [DecimalPipe, NgTemplateOutlet, EmptyState, ErrorState, LoadingIndicator, PageHeader],
-  templateUrl: './triage-page.html',
-  styleUrl: './triage-page.scss',
+  templateUrl: './agent-page.html',
+  styleUrl: './agent-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TriagePage {
-  private readonly api = inject(TriageApiService);
+export class AgentPage {
+  private readonly api = inject(AgentApiService);
   private readonly notifications = inject(NotificationService);
 
-  protected readonly claims = signal<TriageClaimSummary[]>([]);
+  protected readonly samples = SAMPLE_QUESTIONS;
+  protected readonly claims = signal<AgentClaimSummary[]>([]);
   protected readonly claimsLoading = signal(true);
-  protected readonly claimsError = signal<ApiError | null>(null);
 
-  protected readonly selectedClaimId = signal<string>('');
+  protected readonly userInput = signal('');
+  protected readonly system = signal<AgentSystemChoice>('both');
   protected readonly running = signal(false);
-  protected readonly result = signal<TriageRunResponse | null>(null);
+  protected readonly result = signal<AgentRunResponse | null>(null);
   protected readonly runError = signal<ApiError | null>(null);
 
   constructor() {
@@ -35,35 +42,45 @@ export class TriagePage {
 
   async loadClaims(): Promise<void> {
     this.claimsLoading.set(true);
-    this.claimsError.set(null);
     try {
-      const claims = await firstValueFrom(this.api.claims());
-      this.claims.set(claims);
-      if (claims.length && !this.selectedClaimId()) {
-        this.selectedClaimId.set(claims[0].claim_id);
-      }
-    } catch (error) {
-      this.claimsError.set(error as ApiError);
+      this.claims.set(await firstValueFrom(this.api.claims()));
+    } catch {
+      // Claim-id chips are a convenience, not required to use the page - a
+      // failed fetch here shouldn't block asking a free-text question.
+      this.claims.set([]);
     } finally {
       this.claimsLoading.set(false);
     }
   }
 
+  protected useSample(sample: string): void {
+    this.userInput.set(sample);
+  }
+
+  protected onEnter(event: Event): void {
+    const keyboard = event as KeyboardEvent;
+    if (keyboard.shiftKey) {
+      return;
+    }
+    event.preventDefault();
+    void this.run();
+  }
+
   async run(): Promise<void> {
-    const claimId = this.selectedClaimId();
-    if (!claimId || this.running()) {
+    const userInput = this.userInput().trim();
+    if (!userInput || this.running()) {
       return;
     }
     this.running.set(true);
     this.runError.set(null);
     this.result.set(null);
     try {
-      const response = await firstValueFrom(this.api.run({ claim_id: claimId }));
+      const response = await firstValueFrom(this.api.run({ user_input: userInput, system: this.system() }));
       this.result.set(response);
-      if (response.agent.error) {
+      if (response.agent?.error) {
         this.notifications.error(`Agent run failed: ${response.agent.error}`);
       }
-      if (response.workflow.error) {
+      if (response.workflow?.error) {
         this.notifications.error(`Fixed workflow run failed: ${response.workflow.error}`);
       }
     } catch (error) {
@@ -71,6 +88,10 @@ export class TriagePage {
     } finally {
       this.running.set(false);
     }
+  }
+
+  protected retry(): void {
+    void this.run();
   }
 
   protected decisionClass(decision: string | null): string {
@@ -95,7 +116,7 @@ export class TriagePage {
     return JSON.stringify(value, null, 2);
   }
 
-  protected trackStep(_index: number, step: TriageSystemResult['steps'][number]): number {
+  protected trackStep(_index: number, step: AgentStep): number {
     return step.step;
   }
 }

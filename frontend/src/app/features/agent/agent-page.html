@@ -1,16 +1,16 @@
 <div class="page">
   <app-page-header
-    title="Ask the Agent"
-    subtitle="Ask any policy question and watch the agent's and the fixed workflow's tool-by-tool trace side by side, not just the final answer."
+    title="Agent"
+    subtitle="Ask a policy question, or give a claim id (CLM-####) to triage - run the agent and the fixed workflow side by side and watch the path each one took, not just the final answer."
   />
 
   <div class="ask-form">
     <textarea
       class="input textarea"
       rows="3"
-      placeholder="e.g. What is the deductible for a water backup claim under HO-2026-01?"
-      [value]="question()"
-      (input)="question.set($any($event.target).value)"
+      placeholder="e.g. What is the deductible for a water backup claim under HO-2026-01? — or a claim id like CLM-2007"
+      [value]="userInput()"
+      (input)="userInput.set($any($event.target).value)"
       (keydown.enter)="onEnter($event)"
       [disabled]="running()"
     ></textarea>
@@ -18,6 +18,11 @@
       <div class="samples">
         @for (sample of samples; track sample) {
           <button type="button" class="chip" [disabled]="running()" (click)="useSample(sample)">{{ sample }}</button>
+        }
+        @if (!claimsLoading()) {
+          @for (claim of claims(); track claim.claim_id) {
+            <button type="button" class="chip chip--claim" [disabled]="running()" (click)="useSample(claim.claim_id)">{{ claim.claim_id }}</button>
+          }
         }
       </div>
       <select
@@ -31,11 +36,11 @@
         <option value="agent">Agent only</option>
         <option value="workflow">Fixed workflow only</option>
       </select>
-      <button type="button" class="btn btn--primary" [disabled]="running() || !question().trim()" (click)="ask()">
-        {{ running() ? 'Asking…' : 'Ask' }}
+      <button type="button" class="btn btn--primary" [disabled]="running() || !userInput().trim()" (click)="run()">
+        {{ running() ? 'Running…' : 'Run' }}
       </button>
     </div>
-    <p class="faint small">Enter to ask · Shift+Enter for a new line</p>
+    <p class="faint small">Enter to run · Shift+Enter for a new line</p>
   </div>
 
   @if (runError()) {
@@ -46,12 +51,12 @@
     <app-loading-indicator message="Running…" />
   } @else if (!result()) {
     <app-empty-state
-      icon="💬"
-      title="No question asked yet"
-      description="Type a question above (or pick a sample), choose which system(s) to run, and click Ask to see the full step-by-step trace."
+      icon="🧭"
+      title="No run yet"
+      description="Type a question or a claim id above (or pick a sample), choose which system(s) to run, and click Run to see the full step-by-step trace."
     />
   } @else if (result(); as r) {
-    <div class="grid grid--triage">
+    <div class="grid grid--agent">
       @if (r.agent; as agent) {
         <section class="trace-card">
           <h2>Agent</h2>
@@ -74,6 +79,12 @@
   @if (sys.error) {
     <div class="notice notice--warning">{{ sys.error }}</div>
   } @else {
+    @if (sys.decision) {
+      <div class="row row--between">
+        <span [class]="decisionClass(sys.decision)">{{ sys.decision }}</span>
+        <span class="payout">{{ sys.payout !== null ? '$' + (sys.payout | number: '1.0-2') : '—' }}</span>
+      </div>
+    }
     <p class="answer">{{ sys.answer || '(no answer)' }}</p>
 
     <div class="grid grid--stats">
@@ -85,11 +96,12 @@
       <div class="stat">
         <span class="stat__label">Tokens</span>
         <span class="stat__value">{{ sys.tokens_used }}</span>
-        <span class="stat__hint">{{ sys.finished ? 'finished' : 'did not finish' }}</span>
+        <span class="stat__hint">${{ sys.cost_usd | number: '1.5-5' }}</span>
       </div>
       <div class="stat">
         <span class="stat__label">Latency</span>
         <span class="stat__value">{{ sys.latency_ms }}ms</span>
+        <span class="stat__hint">{{ sys.finished ? 'finished' : 'did not finish' }}</span>
       </div>
     </div>
 

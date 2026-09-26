@@ -15,13 +15,11 @@ from app.services.eval_service import EvalService
 from app.services.evaluation_service import EvaluationService
 from app.services.agent_service import ClaimAgent
 from app.services.fixed_claim_workflow import FixedClaimWorkflow
-from app.services.fixed_triage_workflow import FixedClaimTriageWorkflow
 from app.services.index_metadata import IndexMetadata
 from app.services.judge_service import JudgeService
 from app.services.rag_service import RAGService
 from app.services.summary_service import SummaryService
 from app.services.trace_service import TraceService
-from app.services.triage_agent import ClaimTriageAgent
 
 
 @lru_cache(maxsize=1)
@@ -81,20 +79,10 @@ def get_eval_service() -> EvalService:
 
 
 @lru_cache(maxsize=1)
-def get_triage_agent() -> ClaimTriageAgent:
-    return ClaimTriageAgent(retriever=get_rag_service().retriever)
-
-
-@lru_cache(maxsize=1)
-def get_fixed_triage_workflow() -> FixedClaimTriageWorkflow:
-    return FixedClaimTriageWorkflow(retriever=get_rag_service().retriever)
-
-
-@lru_cache(maxsize=1)
-def get_policy_agent() -> ClaimAgent:
+def get_agent() -> ClaimAgent:
     return ClaimAgent(retriever=get_rag_service().retriever)
 
 
 @lru_cache(maxsize=1)
-def get_fixed_policy_workflow() -> FixedClaimWorkflow:
+def get_fixed_workflow() -> FixedClaimWorkflow:
     return FixedClaimWorkflow(retriever=get_rag_service().retriever)

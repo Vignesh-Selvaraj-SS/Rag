@@ -1,12 +1,12 @@
 """
-Unit tests for the Week 7 agent loop, the fixed workflow, and the tools -
-all against fakes, no live model calls.
+Unit tests for the merged claim agent (ClaimAgent, one class handling both
+free-text policy questions and claim-ID triage), its tools, and its fixed
+workflow - all against fakes, no live model calls.
 
 The fakes simulate Groq's native tool-calling response shape
 (`message.tool_calls[].function.{name,arguments}`), not plain-text JSON -
 that is what the real API actually returns, confirmed by a live call before
-this design shipped (see agent_service.py's module docstring for why the
-plain-text-JSON approach was tried first and rejected by the real API).
+this design shipped (see agent_service.py's module docstring).
 """
 
 import json
@@ -16,9 +16,19 @@ from groq import GroqError
 
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
 from app.services.agent_service import ClaimAgent
-from app.services.agent_tools import list_documents, search_policy
+from app.services.agent_tools import (
+    calculate_acv_depreciation,
+    check_settlement_authority,
+    check_subrogation_required,
+    compute_payout,
+    flag_for_review,
+    get_claim,
+    get_special_sublimit,
+    list_documents,
+    search_policy,
+    validate_denial_letter,
+)
 from app.services.fixed_claim_workflow import FixedClaimWorkflow
-
 
 # ------------------------------------------------------------------- fakes
 
@@ -60,7 +70,8 @@ class _FakeCompletions:
     """
     Returns one scripted response per call, in order. An entry may be a
     GroqError instance instead of a message - raised instead of returned,
-    to simulate the two live-observed tool-call-corruption errors.
+    to simulate the live-observed tool-call-corruption/rate-limit errors.
+    A plain string is treated as plain-text model content.
     """
 
     def __init__(self, scripted: list, tokens_each: int = 50):
@@ -75,6 +86,8 @@ class _FakeCompletions:
         item = self._queue.pop(0)
         if isinstance(item, GroqError):
             raise item
+        if isinstance(item, str):
+            return _FakeResponse(_FakeMessage(content=item), self.tokens_each)
         return _FakeResponse(item, self.tokens_each)
 
 
@@ -94,7 +107,7 @@ class _FakeVectorStore:
 
 
 class _FakeRetriever:
-    """Returns one hit for source.md, nothing for unknown sources."""
+    """Returns one water-backup hit; nothing for source='missing.md'."""
 
     def __init__(self):
         self.vector_store = _FakeVectorStore()
@@ -105,13 +118,12 @@ class _FakeRetriever:
         if source == "missing.md":
             hits = []
         else:
-            hits = [
-                {
-                    "chunk_id": "a.md::1", "text": "A $500 deductible applies.",
-                    "source": "a.md", "heading": "Deductible", "page_start": 1, "page_end": 1,
-                    "page": "p.1", "score": 0.8, "dense_score": 0.8,
-                }
-            ]
+            hits = [{
+                "chunk_id": "endorsement-HO-2026-01-water-backup.md::1",
+                "text": "A separate deductible of $500 applies to each water backup occurrence.",
+                "source": "endorsement-HO-2026-01-water-backup.md", "heading": "Deductible",
+                "page_start": 1, "page_end": 1, "page": "p.1", "score": 0.8, "dense_score": 0.8,
+            }]
         best = hits[0]["dense_score"] if hits else 0.0
         return {"question": question, "hits": hits, "best_score": best, "passes_gate": bool(hits), "min_score": 0.6}
 
@@ -133,7 +145,7 @@ def test_search_policy_returns_snippets():
     result = search_policy(_FakeRetriever(), {"query": "deductible"})
 
     assert "result" in result
-    assert result["result"][0]["source"] == "a.md"
+    assert result["result"][0]["source"] == "endorsement-HO-2026-01-water-backup.md"
     assert "500" in result["result"][0]["text"]
 
 
@@ -207,36 +219,160 @@ def test_list_documents_lists_supported_files_and_skips_hidden_ones(tmp_path, mo
     assert result["result"] == ["notes.txt", "policy.md"]
 
 
-# -------------------------------------------------------------- agent loop
+def test_get_claim_returns_the_case_file():
 
-def test_agent_finishes_after_one_search_for_a_simple_claim():
+    result = get_claim({"claim_id": "CLM-2001"})
+
+    assert "result" in result
+    assert result["result"]["claim_id"] == "CLM-2001"
+    assert "adjuster_notes" in result["result"]
+    assert "expected" not in result["result"]  # the answer key never reaches the model
+
+
+def test_get_claim_unknown_id_is_a_logged_error_not_a_crash():
+
+    result = get_claim({"claim_id": "CLM-9999"})
+
+    assert result["error"].startswith("No claim found")
+
+
+def test_compute_payout_subtracts_the_excess_when_approved():
+
+    result = compute_payout({"claimed_amount": 6000, "excess_amount": 500, "claim_status": "approved"})
+
+    assert result["result"]["payout"] == 5500
+
+
+def test_compute_payout_forces_zero_when_denied_even_with_nonzero_inputs():
+
+    result = compute_payout({"claimed_amount": 9000, "excess_amount": 500, "claim_status": "denied"})
+
+    assert result["result"]["payout"] == 0
+
+
+def test_compute_payout_rejects_a_status_outside_the_enum():
+
+    result = compute_payout({"claimed_amount": 100, "excess_amount": 0, "claim_status": "maybe"})
+
+    assert "error" in result
+
+
+def test_check_settlement_authority_picks_the_lowest_covering_grade():
+
+    assert check_settlement_authority({"payout_amount": 8000})["result"]["required_grade"] == "desk_adjuster_grade_1"
+    assert check_settlement_authority({"payout_amount": 80000})["result"]["required_grade"] == "senior_field_adjuster"
+    assert check_settlement_authority({"payout_amount": 2_000_000})["result"]["required_grade"] == "head_of_claims"
+
+
+def test_check_subrogation_required_on_amount_threshold():
+
+    result = check_subrogation_required({"payout_amount": 6000, "cause_of_loss": "wear and tear"})
+
+    assert result["result"]["subrogation_required"] is True
+
+
+def test_check_subrogation_required_on_trigger_phrase_below_threshold():
+
+    result = check_subrogation_required({"payout_amount": 2000, "cause_of_loss": "contractor excavation nicked the line"})
+
+    assert result["result"]["subrogation_required"] is True
+
+
+def test_check_subrogation_not_required_below_threshold_with_no_trigger():
+
+    result = check_subrogation_required({"payout_amount": 1000, "cause_of_loss": "accidental breakage"})
+
+    assert result["result"]["subrogation_required"] is False
+
+
+def test_calculate_acv_depreciation_caps_at_the_maximum():
+
+    result = calculate_acv_depreciation({"replacement_cost": 20000, "roof_material": "composition_shingle", "roof_age_years": 30})
+
+    assert result["result"]["depreciation_pct"] == 0.80
+    assert result["result"]["acv"] == 4000.0
+
+
+def test_calculate_acv_depreciation_rejects_an_unknown_material():
+
+    result = calculate_acv_depreciation({"replacement_cost": 1000, "roof_material": "thatch", "roof_age_years": 5})
+
+    assert "error" in result
+
+
+def test_get_special_sublimit_returns_the_base_form_ceiling():
+
+    result = get_special_sublimit({"item_category": "jewelry_watches_furs_theft", "is_scheduled": False})
+
+    assert result["result"]["sublimit"] == 2000
+
+
+def test_get_special_sublimit_is_bypassed_once_scheduled():
+
+    result = get_special_sublimit({"item_category": "jewelry_watches_furs_theft", "is_scheduled": True})
+
+    assert result["result"]["sublimit"] is None
+
+
+def test_validate_denial_letter_lists_missing_requirements():
+
+    result = validate_denial_letter({"has_second_adjuster_review": True, "cites_specific_paragraph": False})
+
+    assert result["result"]["ready_to_issue"] is False
+    assert "cites_specific_paragraph" in result["result"]["missing_requirements"]
+    assert "second_adjuster_review" not in result["result"]["missing_requirements"]
+
+
+def test_validate_denial_letter_ready_when_all_five_present():
+
+    result = validate_denial_letter({
+        "has_second_adjuster_review": True, "cites_specific_paragraph": True,
+        "has_plain_language_explanation": True, "has_appeal_route": True, "evidence_retained": True,
+    })
+
+    assert result["result"]["ready_to_issue"] is True
+    assert result["result"]["missing_requirements"] == []
+
+
+def test_flag_for_review_needs_both_fields():
+
+    assert "error" in flag_for_review({"claim_id": "CLM-2001"})
+    assert "error" in flag_for_review({"reason": "contradictory notes"})
+    assert "result" in flag_for_review({"claim_id": "CLM-2001", "reason": "contradictory notes"})
+
+
+# ------------------------------------------------------- agent: policy question
+
+def test_agent_finishes_after_one_search_for_a_simple_question():
 
     client = _FakeGroqClient([
         tool_call_message("search_policy", {"query": "water backup deductible"}),
-        tool_call_message("finish", {"answer": "The deductible is $500 [a.md].", "sources": ["a.md"]}),
+        tool_call_message("finish", {"answer": "The deductible is $500.", "sources": ["endorsement-HO-2026-01-water-backup.md"]}),
     ])
 
     agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-    result = agent.run("What is the deductible?")
+    result = agent.run("What is the deductible for a water backup claim?")
 
     assert result["finished"] is True
     assert result["stopped_reason"] == "finished"
     assert result["step_count"] == 2
-    assert result["answer"] == "The deductible is $500 [a.md]."
+    assert result["answer"] == "The deductible is $500."
+    assert result["decision"] is None  # a policy question never gets a coverage decision
+    assert result["payout"] is None
     assert result["steps"][0]["tool"] == "search_policy"
     assert result["steps"][1]["tool"] == "finish"
 
 
-def test_agent_can_take_a_second_targeted_search_before_finishing():
+def test_agent_can_use_list_documents_before_a_targeted_search():
 
     client = _FakeGroqClient([
         tool_call_message("list_documents"),
-        tool_call_message("search_policy", {"query": "subrogation", "source": "a.md"}),
-        tool_call_message("finish", {"answer": "Deductible $500, subrogation per a.md.", "sources": ["a.md"]}),
+        tool_call_message("search_policy", {"query": "subrogation", "source": "endorsement-HO-2026-01-water-backup.md"}),
+        tool_call_message("finish", {"answer": "Deductible $500, subrogation per the endorsement.", "sources": []}),
     ])
 
     agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-    result = agent.run("Compound claim needing two lookups")
+    result = agent.run("Compound question needing two lookups")
 
     assert result["step_count"] == 3
     assert [s["tool"] for s in result["steps"]] == ["list_documents", "search_policy", "finish"]
@@ -252,117 +388,6 @@ def test_agent_treats_a_plain_text_reply_as_an_implicit_finish():
     assert result["finished"] is True
     assert result["answer"] == "The deductible is $500, no tool needed."
     assert "implicit" in result["steps"][0]["tool"]
-
-
-def test_agent_stops_at_the_step_limit_without_crashing():
-
-    # Never calls finish - always searches again.
-    client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10)
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-    result = agent.run("An unanswerable loop", max_steps=3)
-
-    assert result["stopped_reason"] == "step_limit"
-    assert result["finished"] is False
-    assert result["step_count"] == 3
-
-
-def test_agent_stops_at_the_token_budget():
-
-    client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10, tokens_each=400)
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-    result = agent.run("x", max_steps=10, max_tokens=900)
-
-    assert result["stopped_reason"] == "token_limit"
-    assert result["tokens_used"] < 10 * 400
-
-
-def test_agent_handles_an_unknown_tool_name_as_a_logged_error_not_a_crash():
-
-    client = _FakeGroqClient([
-        tool_call_message("delete_everything", {}),
-        tool_call_message("finish", {"answer": "Recovered.", "sources": []}),
-    ])
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-    result = agent.run("x")
-
-    assert result["steps"][0]["result"]["error"].startswith("Unknown tool")
-    assert result["finished"] is True
-
-
-def test_agent_retries_after_a_malformed_tool_call_response():
-
-    # Both errors observed live: a long `finish` answer that failed to
-    # valid-JSON-encode, and a stray formatting token corrupting the tool
-    # name itself ("finish<|channel|>commentary"). Both should be retried,
-    # not fail the run.
-    client = _FakeGroqClient([
-        GroqError("Failed to parse tool call arguments as JSON"),
-        GroqError("Tool call validation failed: attempted to call tool 'finish<|channel|>commentary'"),
-        tool_call_message("finish", {"answer": "Recovered after two retries.", "sources": []}),
-    ])
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-    result = agent.run("x")
-
-    assert result["finished"] is True
-    assert result["answer"] == "Recovered after two retries."
-
-
-def test_agent_does_not_retry_an_unrelated_error():
-
-    client = _FakeGroqClient([GroqError("internal server error")])
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-
-    with pytest.raises(LLMUpstreamError):
-        agent.run("x")
-
-    assert len(client.chat.completions.calls) == 1  # no retry spent on a different kind of error
-
-
-def test_agent_retries_after_a_rate_limit_error(monkeypatch):
-
-    # Live-observed: Groq's free-tier tokens-per-minute limit can be hit mid-run.
-    # Nothing is malformed, so this should wait and retry, not fail the run.
-    waits = []
-    monkeypatch.setattr("app.services.agent_service.time.sleep", lambda s: waits.append(s))
-
-    client = _FakeGroqClient([
-        GroqError("Rate limit reached for model. Please try again in 2.3775s."),
-        tool_call_message("finish", {"answer": "Recovered after a rate limit wait.", "sources": []}),
-    ])
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-    result = agent.run("x")
-
-    assert result["finished"] is True
-    assert result["answer"] == "Recovered after a rate limit wait."
-    assert waits == [15]  # RATE_LIMIT_WAIT_S * (attempt 0 + 1)
-
-
-def test_agent_gives_up_after_exhausting_rate_limit_retries(monkeypatch):
-
-    monkeypatch.setattr("app.services.agent_service.time.sleep", lambda s: None)
-
-    client = _FakeGroqClient([GroqError("rate limit exceeded")] * 5)  # RATE_LIMIT_RETRIES + 1
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
-
-    with pytest.raises(LLMUpstreamError):
-        agent.run("x")
-
-    assert len(client.chat.completions.calls) == 5
-
-
-def test_agent_raises_when_no_api_key_configured():
-
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=None)
-
-    with pytest.raises(LLMNotConfiguredError):
-        agent.run("x")
 
 
 def test_agent_only_acts_on_the_first_tool_call_when_the_model_offers_several():
@@ -383,20 +408,318 @@ def test_agent_only_acts_on_the_first_tool_call_when_the_model_offers_several():
     assert result["step_count"] == 2
 
 
+def test_agent_handles_an_unknown_tool_name_as_a_logged_error_not_a_crash():
+
+    client = _FakeGroqClient([
+        tool_call_message("delete_everything", {}),
+        tool_call_message("finish", {"answer": "Recovered.", "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("x")
+
+    assert result["steps"][0]["result"]["error"].startswith("Unknown tool")
+    assert result["finished"] is True
+
+
+def test_agent_raises_when_no_api_key_configured():
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=None)
+
+    with pytest.raises(LLMNotConfiguredError):
+        agent.run("x")
+
+
+# --------------------------------------------------------------- agent: triage
+
+def test_agent_triages_a_claim_calling_get_claim_search_and_compute_payout():
+
+    client = _FakeGroqClient([
+        tool_call_message("get_claim", {"claim_id": "CLM-2001"}),
+        tool_call_message("search_policy", {"query": "water backup deductible"}),
+        tool_call_message("compute_payout", {"claimed_amount": 6000, "excess_amount": 500, "claim_status": "approved"}),
+        tool_call_message("finish", {
+            "answer": "Sewer backup covered under HO-2026-01, $500 deductible applies.",
+            "decision": "approved", "payout": 5500,
+            "sources": ["endorsement-HO-2026-01-water-backup.md"],
+        }),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("CLM-2001")
+
+    assert result["finished"] is True
+    assert result["decision"] == "approved"
+    assert result["payout"] == 5500
+    assert result["stopped_reason"] == "finished"
+    assert [s["tool"] for s in result["steps"]] == ["get_claim", "search_policy", "compute_payout", "finish"]
+
+
+def test_agent_can_use_a_further_triage_tool_before_finishing():
+
+    client = _FakeGroqClient([
+        tool_call_message("get_claim", {"claim_id": "CLM-2007"}),
+        tool_call_message("search_policy", {"query": "fire roof replacement cost"}),
+        tool_call_message("compute_payout", {"claimed_amount": 120000, "excess_amount": 1000, "claim_status": "approved"}),
+        tool_call_message("check_settlement_authority", {"payout_amount": 119000}),
+        tool_call_message("finish", {
+            "answer": "Fire loss, replacement cost basis; requires senior field adjuster authority.",
+            "decision": "approved", "payout": 119000,
+            "sources": ["claims-adjuster-authority.md"],
+        }),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("CLM-2007")
+
+    assert result["finished"] is True
+    assert result["payout"] == 119000
+    authority_step = next(s for s in result["steps"] if s["tool"] == "check_settlement_authority")
+    assert authority_step["result"]["result"]["required_grade"] == "senior_field_adjuster"
+
+
+def test_agent_flag_for_review_ends_the_run_as_escalated_not_decided():
+
+    client = _FakeGroqClient([
+        tool_call_message("get_claim", {"claim_id": "CLM-2001"}),
+        tool_call_message("flag_for_review", {"claim_id": "CLM-2001", "reason": "notes contradict the policy form on file"}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("CLM-2001")
+
+    assert result["decision"] == "escalated"
+    assert result["payout"] is None
+    assert "notes contradict the policy form on file" in result["answer"]
+    assert result["stopped_reason"] == "finished"
+
+
+# ------------------------------------------------------------------ 4 budgets
+
+def test_agent_enforces_the_iteration_limit():
+
+    client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10)
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("x", max_iterations=3)
+
+    assert result["stopped_reason"] == "iteration_limit"
+    assert result["finished"] is False
+    assert result["step_count"] == 3
+
+
+def test_agent_enforces_the_token_limit():
+
+    client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10, tokens_each=400)
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("x", max_iterations=10, max_tokens=900)
+
+    assert result["stopped_reason"] == "token_limit"
+    assert result["tokens_used"] < 10 * 400
+
+
+def test_agent_enforces_the_cost_limit():
+
+    # 400 tokens/call at the assumed $0.20/1M rate is $0.00008/call - a
+    # max_cost_usd of $0.00015 trips after the second call, well before the
+    # iteration or token budgets would.
+    client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10, tokens_each=400)
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("x", max_iterations=10, max_tokens=100000, max_cost_usd=0.00015)
+
+    assert result["stopped_reason"] == "cost_limit"
+    assert result["step_count"] < 10
+
+
+def test_agent_enforces_the_wall_clock_budget():
+
+    client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10)
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("x", max_iterations=10, max_seconds=0.0)
+
+    assert result["stopped_reason"] == "time_limit"
+
+
+# ---------------------------------------------------------------------- retry
+
+def test_agent_retries_after_a_malformed_tool_call_response():
+
+    # Both errors observed live: a long `finish` answer that failed to
+    # valid-JSON-encode, and a stray formatting token corrupting the tool
+    # name itself ("finish<|channel|>commentary"). Both should be retried.
+    client = _FakeGroqClient([
+        GroqError("Failed to parse tool call arguments as JSON"),
+        GroqError("Tool call validation failed: attempted to call tool 'finish<|channel|>commentary'"),
+        tool_call_message("finish", {"answer": "Recovered after two retries.", "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("x")
+
+    assert result["finished"] is True
+    assert result["answer"] == "Recovered after two retries."
+
+
+def test_agent_survives_repeated_output_parse_failures():
+
+    # Regression test: a live run hit Groq's "output_parse_failed" error
+    # (the model's own chain-of-thought leaking out unparsed instead of a
+    # clean `finish` tool call) three times in a row - the shared retry
+    # helper's TOOL_PARSE_RETRIES=4 gives room to recover on the 4th retry.
+    client = _FakeGroqClient([
+        GroqError("Parsing failed. The model generated output that could not be parsed."),
+        GroqError("Parsing failed. The model generated output that could not be parsed."),
+        GroqError("Parsing failed. The model generated output that could not be parsed."),
+        tool_call_message("finish", {"answer": "Recovered.", "decision": "approved", "payout": 8000, "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("CLM-2010")
+
+    assert result["finished"] is True
+    assert result["payout"] == 8000
+
+
+def test_agent_does_not_retry_an_unrelated_error():
+
+    client = _FakeGroqClient([GroqError("internal server error")])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+
+    with pytest.raises(LLMUpstreamError):
+        agent.run("x")
+
+    assert len(client.chat.completions.calls) == 1  # no retry spent on a different kind of error
+
+
+def test_agent_retries_after_a_rate_limit_error(monkeypatch):
+
+    # Live-observed: Groq's tokens-per-minute/day limits can be hit mid-run.
+    # Nothing is malformed, so this should wait and retry, not fail the run.
+    # The shared retry helper lives in groq_retry.py, not agent_service.py -
+    # patch the actual call site.
+    waits = []
+    monkeypatch.setattr("app.services.groq_retry.time.sleep", lambda s: waits.append(s))
+
+    client = _FakeGroqClient([
+        GroqError("Rate limit reached for model. Please try again in 2.3775s."),
+        tool_call_message("finish", {"answer": "Recovered after a rate limit wait.", "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("x")
+
+    assert result["finished"] is True
+    assert result["answer"] == "Recovered after a rate limit wait."
+    assert waits == [15]  # RATE_LIMIT_WAIT_S * (attempt 0 + 1)
+
+
+def test_agent_gives_up_after_exhausting_rate_limit_retries(monkeypatch):
+
+    monkeypatch.setattr("app.services.groq_retry.time.sleep", lambda s: None)
+
+    client = _FakeGroqClient([GroqError("rate limit exceeded")] * 5)  # RATE_LIMIT_RETRIES + 1
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+
+    with pytest.raises(LLMUpstreamError):
+        agent.run("x")
+
+    assert len(client.chat.completions.calls) == 5
+
+
+def test_agent_attaches_steps_so_far_to_a_hard_failure():
+
+    # Live bug, full-race run: a hard upstream failure (Groq's daily token
+    # cap) hit mid-claim, and the caller had no way to see what the run had
+    # already done, because that history was discarded on the way up as a
+    # bare exception.
+    client = _FakeGroqClient([
+        tool_call_message("get_claim", {"claim_id": "CLM-2001"}),
+        GroqError("internal server error"),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+
+    with pytest.raises(LLMUpstreamError) as excinfo:
+        agent.run("CLM-2001")
+
+    assert [s["tool"] for s in excinfo.value.steps] == ["get_claim"]
+    assert excinfo.value.tokens_used == 50
+
+
 # ---------------------------------------------------------------- workflow
 
-def test_fixed_workflow_always_takes_exactly_two_steps():
+def test_fixed_workflow_answers_a_question_in_exactly_two_steps():
 
-    client = _FakeGroqClient([_FakeMessage(content="The deductible is $500, per the fixed retrieval.")])
+    client = _FakeGroqClient(["The deductible is $500, per the fixed retrieval."])
     retriever = _FakeRetriever()
 
     workflow = FixedClaimWorkflow(retriever=retriever, client=client)
-    result = workflow.run("Any claim at all")
+    result = workflow.run("What is the deductible for water backup?")
 
     assert result["step_count"] == 2
     assert result["finished"] is True
+    assert result["decision"] is None
+    assert result["payout"] is None
     assert retriever.calls[0]["top_k"] == 8
     assert retriever.calls[0]["source"] is None
+
+
+def test_fixed_workflow_triages_a_claim_id_in_exactly_four_steps():
+
+    decision_json = json.dumps({
+        "claim_status": "approved", "excess_amount": 500,
+        "reasoning": "Sewer backup covered under HO-2026-01.",
+        "sources": ["endorsement-HO-2026-01-water-backup.md"],
+    })
+    client = _FakeGroqClient([decision_json])
+
+    workflow = FixedClaimWorkflow(retriever=_FakeRetriever(), client=client)
+    result = workflow.run("CLM-2001")
+
+    assert result["finished"] is True
+    assert result["decision"] == "approved"
+    assert result["payout"] == 5500  # 6000 - 500, computed by code, not the model
+    assert result["step_count"] == 4
+    assert len(client.chat.completions.calls) == 1  # exactly one generation call, no loop
+
+
+def test_fixed_workflow_routes_by_input_shape_not_content():
+
+    # A claim ID (however it's cased) triggers the triage branch; anything
+    # else, even something claim-adjacent, gets the question branch.
+    client = _FakeGroqClient(["An answer."])
+    workflow = FixedClaimWorkflow(retriever=_FakeRetriever(), client=client)
+
+    result = workflow.run("what is CLM-2001 about?")  # not itself a bare claim id
+
+    assert result["step_count"] == 2  # question branch, not triage
+
+
+def test_fixed_workflow_returns_an_error_result_on_unparseable_output():
+
+    client = _FakeGroqClient(["not json at all"])
+
+    workflow = FixedClaimWorkflow(retriever=_FakeRetriever(), client=client)
+    result = workflow.run("CLM-2001")
+
+    assert result["finished"] is False
+    assert result["stopped_reason"] == "error"
+
+
+def test_fixed_workflow_returns_an_error_result_for_an_unknown_claim():
+
+    client = _FakeGroqClient([])  # never reached - fails at step 1
+
+    workflow = FixedClaimWorkflow(retriever=_FakeRetriever(), client=client)
+    result = workflow.run("CLM-9999")
+
+    assert result["finished"] is False
+    assert result["step_count"] == 1
 
 
 def test_fixed_workflow_raises_when_no_api_key_configured():

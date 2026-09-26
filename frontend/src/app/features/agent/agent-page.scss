@@ -14,6 +14,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  flex: 1;
 }
 
 .chip {
@@ -31,13 +32,57 @@
   }
 }
 
+.chip--claim {
+  font-family: var(--font-mono);
+  border-style: dashed;
+}
+
+.decision {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.decision--approved {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.decision--denied {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.decision--partial {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.decision--escalated {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.decision--unknown {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.payout {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
 .answer {
   margin: 0;
   font-size: 0.95rem;
   color: var(--text);
 }
 
-.grid--triage {
+.grid--agent {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 16px;

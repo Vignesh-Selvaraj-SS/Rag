@@ -1,10 +1,10 @@
-export interface TriageClaimSummary {
+export interface AgentClaimSummary {
   claim_id: string;
   claimed_amount: number;
   policy_form: string;
 }
 
-export interface TriageStep {
+export interface AgentStep {
   step: number;
   tool: string;
   thought: string | null;
@@ -14,12 +14,14 @@ export interface TriageStep {
   tokens: number | null;
 }
 
-export interface TriageSystemResult {
+export type AgentSystemChoice = 'both' | 'agent' | 'workflow';
+
+export interface AgentSystemResult {
+  answer: string | null;
   decision: string | null;
   payout: number | null;
-  reasoning: string;
   sources: string[];
-  steps: TriageStep[];
+  steps: AgentStep[];
   step_count: number;
   tokens_used: number;
   cost_usd: number;
@@ -29,12 +31,13 @@ export interface TriageSystemResult {
   error: string | null;
 }
 
-export interface TriageRunRequest {
-  claim_id: string;
+export interface AgentRunRequest {
+  user_input: string;
+  system: AgentSystemChoice;
 }
 
-export interface TriageRunResponse {
-  claim_id: string;
-  agent: TriageSystemResult;
-  workflow: TriageSystemResult;
+export interface AgentRunResponse {
+  user_input: string;
+  agent: AgentSystemResult | null;
+  workflow: AgentSystemResult | null;
 }
