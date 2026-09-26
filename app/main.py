@@ -11,8 +11,10 @@ from app import __version__
 from app.api.chat import router as chat_router
 from app.api.documents import router as documents_router
 from app.api.evaluation import router as evaluation_router
+from app.api.policy_qa import router as policy_qa_router
 from app.api.settings import router as settings_router
 from app.api.traces import router as traces_router
+from app.api.triage import router as triage_router
 from app.core.config import settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
@@ -79,6 +81,8 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
     app.include_router(documents_router)
     app.include_router(evaluation_router)
     app.include_router(traces_router)
+    app.include_router(triage_router)
+    app.include_router(policy_qa_router)
 
     dist = settings.FRONTEND_DIST if frontend_dist is None else frontend_dist
 

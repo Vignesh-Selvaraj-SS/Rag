@@ -1,0 +1,128 @@
+.grid--triage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.trace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+
+  h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+}
+
+.decision {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.decision--approved {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.decision--denied {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.decision--partial {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.decision--escalated {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.decision--unknown {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.payout {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.reasoning {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+}
+
+.step__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.step__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.step__tool {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.step__thought {
+  margin: 2px 0 6px;
+}
+
+.step__block {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.step__block--result {
+  border-style: dashed;
+}
