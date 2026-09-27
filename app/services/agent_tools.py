@@ -2,8 +2,15 @@
 The tools the merged claim agent can call: general policy Q&A tools
 (`search_policy`, `list_documents`) plus the claim-triage tools that used to
 live in a separate `triage_tools.py` before `ClaimAgent`/`ClaimTriageAgent`
-were merged into one class - `get_claim`, `compute_payout`, and six further
-tools grounded in real tables in the indexed documents.
+were merged into one class - `get_claim`, `compute_payout`, and two further
+situational tools (`check_settlement_authority`, `flag_for_review`).
+
+Originally shipped with four more situational tools
+(`check_subrogation_required`, `calculate_acv_depreciation`,
+`get_special_sublimit`, `validate_denial_letter`) - cut once none of the 10
+fixture claims in `evaluation/trajectory_expected.json` ever required them
+(every claim's `must_include` is just `search_policy`/`compute_payout`), so
+they had no live trigger case and no evidence they were ever exercised.
 
 Every tool function takes a single `args: dict` and returns a small dict the
 agent logs and feeds back into the next prompt. A tool never raises for a
@@ -18,10 +25,23 @@ The `_resolve_source` fix (below) still stays regardless: it protects
 against a guessed name whether or not `list_documents` was actually called.
 """
 
+import re
+
 from app.core.config import settings
 from app.services.claims_data import get_claim_record
 from app.services.document_loader import SUPPORTED_EXTENSIONS
 from app.services.retrieval_service import RetrievalService
+
+# Shared by ClaimAgent and FixedClaimWorkflow: a deterministic, code-level
+# check for "is this input a claim id," not a model judgment call. Live bug
+# this exists to fix: merging both jobs into one agent meant sending BOTH
+# jobs' tool schemas and BOTH jobs' system-prompt rules on every single
+# turn - roughly double the per-call token cost of either original agent -
+# and a live run on CLM-2001 (previously a simple, 4-step claim) burned
+# 17,204 tokens across 5 steps and hit token_limit without ever finishing.
+# Scoping the tools and the prompt by input shape fixes the actual cost
+# regression the merge introduced, not just its symptom (a bigger budget).
+CLAIM_ID_PATTERN = re.compile(r"^CLM-\d+$", re.IGNORECASE)
 
 # How much chunk text is shown to the agent per hit. Found the hard way,
 # live: 320 chars cut off a real chunk (claims-adjuster-authority.md's
@@ -203,40 +223,6 @@ _AUTHORITY_LEVELS = [
     ("head_of_claims", float("inf")),
 ]
 
-# claims-adjuster-authority.md §6 - triggers requiring Recovery unit referral
-# regardless of amount.
-_SUBROGATION_TRIGGER_PHRASES = (
-    "utility", "contractor excavation", "excavation", "manufacturing defect",
-    "municipal sewer", "contractor was working", "contractor on",
-)
-_SUBROGATION_AMOUNT_THRESHOLD = 5_000
-
-# endorsement-HO-2026-08-roof-surfaces-acv.md - depreciation schedule.
-_ROOF_DEPRECIATION = {
-    "composition_shingle": (0.050, 0.80),
-    "architectural_shingle": (0.033, 0.70),
-    "wood_shake": (0.040, 0.75),
-    "metal_panel": (0.025, 0.60),
-    "clay_tile": (0.020, 0.50),
-    "slate": (0.017, 0.50),
-    "modified_bitumen": (0.050, 0.80),
-}
-
-# policy-base-HO3-2026.md - Coverage C special limits of liability, per
-# occurrence. None of these apply once the item is separately scheduled.
-_SPECIAL_SUBLIMITS = {
-    "money_bank_notes_bullion_coins": 250,
-    "securities_deeds_manuscripts_tickets": 1_750,
-    "watercraft": 1_750,
-    "trailers_not_with_watercraft": 1_750,
-    "jewelry_watches_furs_theft": 2_000,
-    "firearms_theft": 2_750,
-    "silverware_goldware_theft": 2_750,
-    "business_property_on_premises": 3_000,
-    "business_property_away": 750,
-    "portable_electronics_in_vehicle": 1_750,
-}
-
 
 def check_settlement_authority(args: dict) -> dict:
     """
@@ -255,100 +241,6 @@ def check_settlement_authority(args: dict) -> dict:
             return {"result": {"required_grade": grade, "authority_limit": limit if limit != float("inf") else "policy_limits"}}
 
     return {"result": {"required_grade": "head_of_claims", "authority_limit": "policy_limits"}}  # pragma: no cover - inf always matches above
-
-
-def check_subrogation_required(args: dict) -> dict:
-    """
-    Determine whether subrogation must be evaluated and referred to the
-    Recovery unit, from the payout amount and a short description of the
-    cause of loss. Does not look up coverage or compute anything - a pure
-    policy-procedure check.
-    """
-
-    try:
-        payout_amount = float(args.get("payout_amount"))
-    except (TypeError, ValueError):
-        return {"error": "check_subrogation_required needs a numeric 'payout_amount'."}
-
-    cause_of_loss = str(args.get("cause_of_loss") or "").lower()
-
-    above_threshold = payout_amount > _SUBROGATION_AMOUNT_THRESHOLD
-    matched_trigger = next((p for p in _SUBROGATION_TRIGGER_PHRASES if p in cause_of_loss), None)
-
-    required = above_threshold or matched_trigger is not None
-    reason = (
-        matched_trigger and f"cause of loss matches a mandatory-referral trigger: {matched_trigger!r}"
-        or above_threshold and f"payout exceeds the ${_SUBROGATION_AMOUNT_THRESHOLD:,} evaluation threshold"
-        or "no threshold or trigger matched"
-    )
-
-    return {"result": {"subrogation_required": required, "reason": reason}}
-
-
-def calculate_acv_depreciation(args: dict) -> dict:
-    """
-    Compute actual cash value from replacement cost, roof material and roof
-    age, using the endorsement's depreciation schedule. Pure arithmetic -
-    does not decide whether the ACV basis applies to this loss at all (that
-    depends on cause of loss - wind/hail only - which is a coverage
-    judgment, not this tool's job).
-    """
-
-    material = str(args.get("roof_material") or "").strip().lower()
-
-    if material not in _ROOF_DEPRECIATION:
-        return {"error": f"roof_material must be one of {sorted(_ROOF_DEPRECIATION)}, got {material!r}."}
-
-    try:
-        replacement_cost = float(args.get("replacement_cost"))
-        roof_age_years = float(args.get("roof_age_years"))
-    except (TypeError, ValueError):
-        return {"error": "calculate_acv_depreciation needs numeric 'replacement_cost' and 'roof_age_years'."}
-
-    annual_rate, max_depreciation = _ROOF_DEPRECIATION[material]
-    depreciation_pct = min(max_depreciation, annual_rate * max(0.0, roof_age_years))
-    acv = round(replacement_cost * (1 - depreciation_pct), 2)
-
-    return {"result": {"depreciation_pct": round(depreciation_pct, 4), "acv": acv}}
-
-
-def get_special_sublimit(args: dict) -> dict:
-    """
-    Look up the base form's special limit of liability for one item
-    category. Does not check whether the item is covered at all - only
-    returns the sub-limit ceiling that would apply if it is.
-    """
-
-    category = str(args.get("item_category") or "").strip().lower()
-    is_scheduled = bool(args.get("is_scheduled", False))
-
-    if category not in _SPECIAL_SUBLIMITS:
-        return {"error": f"item_category must be one of {sorted(_SPECIAL_SUBLIMITS)}, got {category!r}."}
-
-    if is_scheduled:
-        return {"result": {"sublimit": None, "note": "Item is separately scheduled (HO-2026-04) - the base form's special limit does not apply."}}
-
-    return {"result": {"sublimit": _SPECIAL_SUBLIMITS[category]}}
-
-
-def validate_denial_letter(args: dict) -> dict:
-    """
-    Check a proposed denial against CP-09's 5 hard requirements before it
-    can be issued. Does not decide whether to deny the claim - only whether
-    a denial, once decided, is procedurally ready to send.
-    """
-
-    checks = {
-        "second_adjuster_review": bool(args.get("has_second_adjuster_review", False)),
-        "cites_specific_paragraph": bool(args.get("cites_specific_paragraph", False)),
-        "plain_language_explanation": bool(args.get("has_plain_language_explanation", False)),
-        "appeal_route_included": bool(args.get("has_appeal_route", False)),
-        "evidence_retained": bool(args.get("evidence_retained", False)),
-    }
-
-    missing = [name for name, passed in checks.items() if not passed]
-
-    return {"result": {"ready_to_issue": not missing, "missing_requirements": missing}}
 
 
 def flag_for_review(args: dict) -> dict:
@@ -389,11 +281,13 @@ TOOL_SCHEMAS = [
             "description": (
                 "Search the indexed policy and procedure documents for text relevant to "
                 "the query. Never returns claim-specific facts (amount, notes, peril) - that "
-                "is get_claim's job. Leave `source` unset to search everything. Set `source` "
-                "to one exact file name (from list_documents) only once you already suspect "
-                "the fact you need lives in that specific document - for example, once you "
-                "suspect the answer depends on settlement authority or claims procedure "
-                "rather than an endorsement."
+                "is get_claim's job. Never use this to check an adjuster's settlement "
+                "authority - call check_settlement_authority instead, which is exact and "
+                "faster than searching for the authority table in text. Leave `source` "
+                "unset to search everything. Set `source` to one exact file name (from "
+                "list_documents) only once you already suspect the fact you need lives in "
+                "that specific document - for example, a specific endorsement or claims "
+                "procedure question."
             ),
             "parameters": {
                 "type": "object",
@@ -484,96 +378,6 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "check_subrogation_required",
-            "description": (
-                "Determine whether subrogation must be evaluated and referred to the Recovery "
-                "unit. Does not look up coverage or compute a payout - a pure claims-procedure "
-                "check, based only on the payout amount and the cause of loss."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "payout_amount": {"type": "number", "description": "The payout amount, exactly as compute_payout returned it."},
-                    "cause_of_loss": {"type": "string", "description": "A short description of what caused the loss, e.g. 'contractor excavation damaged the service line'."},
-                },
-                "required": ["payout_amount", "cause_of_loss"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "calculate_acv_depreciation",
-            "description": (
-                "Compute actual cash value from a replacement cost, the roof material and the "
-                "roof's age, using the depreciation schedule. Pure arithmetic - does not decide "
-                "whether ACV settlement even applies to this loss (that depends on cause of "
-                "loss - wind/hail only - a coverage judgment made from search_policy, not here)."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "replacement_cost": {"type": "number", "description": "The replacement-cost estimate for the roof surfacing."},
-                    "roof_material": {
-                        "type": "string",
-                        "enum": sorted(_ROOF_DEPRECIATION),
-                        "description": "The roof surfacing material.",
-                    },
-                    "roof_age_years": {"type": "number", "description": "Age of the roof surfacing in years."},
-                },
-                "required": ["replacement_cost", "roof_material", "roof_age_years"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_special_sublimit",
-            "description": (
-                "Look up the base form's special limit of liability for one item category "
-                "(e.g. jewelry, firearms, cash). Does not check whether the item is covered at "
-                "all - only the sub-limit ceiling that would apply if it is, and whether that "
-                "ceiling is bypassed because the item is separately scheduled."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "item_category": {
-                        "type": "string",
-                        "enum": sorted(_SPECIAL_SUBLIMITS),
-                        "description": "The item category.",
-                    },
-                    "is_scheduled": {"type": "boolean", "description": "True if the item is separately scheduled under HO-2026-04."},
-                },
-                "required": ["item_category"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "validate_denial_letter",
-            "description": (
-                "Check a proposed denial against CP-09's 5 hard requirements before it can be "
-                "issued. Does not decide whether to deny the claim - only whether a denial, "
-                "once decided, is procedurally ready to send."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "has_second_adjuster_review": {"type": "boolean"},
-                    "cites_specific_paragraph": {"type": "boolean"},
-                    "has_plain_language_explanation": {"type": "boolean"},
-                    "has_appeal_route": {"type": "boolean"},
-                    "evidence_retained": {"type": "boolean"},
-                },
-                "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "flag_for_review",
             "description": (
                 "Escalate a claim for human review instead of finishing it - the only action/"
@@ -627,4 +431,18 @@ TOOL_SCHEMAS = [
             },
         },
     },
+]
+
+_SCHEMA_BY_NAME = {schema["function"]["name"]: schema for schema in TOOL_SCHEMAS}
+
+# The tool subsets ClaimAgent actually sends per call, picked by
+# CLAIM_ID_PATTERN - not the full TOOL_SCHEMAS every time. `finish` is
+# unified across both (see its description above), so it's in both subsets.
+QUESTION_TOOL_SCHEMAS = [_SCHEMA_BY_NAME[name] for name in ("search_policy", "list_documents", "finish")]
+
+TRIAGE_TOOL_SCHEMAS = [
+    _SCHEMA_BY_NAME[name] for name in (
+        "get_claim", "search_policy", "compute_payout", "check_settlement_authority",
+        "flag_for_review", "finish",
+    )
 ]

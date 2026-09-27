@@ -23,14 +23,13 @@ something the model computes and might round or miscopy.
 
 import json
 import logging
-import re
 import time
 
 from groq import Groq, GroqError
 
 from app.core.config import settings
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
-from app.services.agent_tools import CLAIM_STATUSES, compute_payout, get_claim
+from app.services.agent_tools import CLAIM_ID_PATTERN, CLAIM_STATUSES, compute_payout, get_claim
 from app.services.groq_retry import create_completion_with_retry
 from app.services.retrieval_service import RetrievalService
 
@@ -55,8 +54,6 @@ MAX_TOKENS_TRIAGE = 1500
 # workflow never gets a second, targeted look, it compensates by casting a
 # wider net on the one search it gets, on either branch.
 FIXED_TOP_K = 8
-
-CLAIM_ID_PATTERN = re.compile(r"^CLM-\d+$", re.IGNORECASE)
 
 QUESTION_SYSTEM_PROMPT = """
 You are a claims assistant for Meridian Mutual. You are given a policy

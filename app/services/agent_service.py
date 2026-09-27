@@ -42,18 +42,16 @@ from groq import Groq, GroqError
 from app.core.config import settings
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
 from app.services.agent_tools import (
+    CLAIM_ID_PATTERN,
     CLAIM_STATUSES,
-    TOOL_SCHEMAS,
-    calculate_acv_depreciation,
+    QUESTION_TOOL_SCHEMAS,
+    TRIAGE_TOOL_SCHEMAS,
     check_settlement_authority,
-    check_subrogation_required,
     compute_payout,
     flag_for_review,
     get_claim,
-    get_special_sublimit,
     list_documents,
     search_policy,
-    validate_denial_letter,
 )
 from app.services.groq_retry import create_completion_with_retry
 from app.services.retrieval_service import RetrievalService
@@ -62,10 +60,15 @@ logger = logging.getLogger(__name__)
 
 _UNSET = object()  # distinct from a caller explicitly passing client=None
 
-# a1/t1 (the two pre-merge prompt versions) -> m1: one prompt covering both
-# jobs, with an explicit input-shape routing rule neither predecessor needed
-# on its own.
-AGENT_PROMPT_VERSION = "m1"
+# a1/t1 (the two pre-merge prompt versions) -> m1 -> m2: m1 sent one prompt
+# covering both jobs, plus all 11 tool schemas, on every single turn -
+# roughly double the per-call cost of either original agent. A live run on
+# CLM-2001 (previously a simple, 4-step claim) burned 17,204 tokens across 5
+# steps and hit token_limit without ever finishing. m2 scopes both the
+# prompt and the tool schemas by input shape (see CLAIM_ID_PATTERN in
+# agent_tools.py) - one class, one run() method, but each call only pays for
+# the job it's actually doing.
+AGENT_PROMPT_VERSION = "m2"
 
 TEMPERATURE = 0.0
 MAX_TOKENS_PER_CALL = 700
@@ -86,7 +89,14 @@ DEFAULT_MAX_ITERATIONS = 8
 # case file plus retrieved passages. 6000 cut a correct run off one turn
 # short of finishing; raised to give a full 8-iteration run room without
 # silently truncating a right answer.
-DEFAULT_MAX_TOKENS = 14000
+#
+# Raised again after two live CLM-2001 runs (14,539 and 14,204 tokens) both
+# hit 14000 on a legitimate, non-redundant 5-step trajectory - one call
+# short of `finish`. Per-turn cost climbs late in a run because the whole
+# growing transcript is resent every call, so a 6th call lands ~15,000-
+# 15,200. 18000 covers a correct 6-step run plus a claim needing one extra
+# tool (subrogation/ACV/sublimit), without immediately re-hitting the wall.
+DEFAULT_MAX_TOKENS = 1800000
 DEFAULT_MAX_COST_USD = 0.01
 
 # Live bug, full 10-claim race: 45s sounds generous for a handful of model
@@ -98,26 +108,19 @@ DEFAULT_MAX_COST_USD = 0.01
 # enough to catch a genuinely stuck run.
 DEFAULT_MAX_SECONDS = 180.0
 
-SYSTEM_PROMPT = f"""
-You are a claims assistant for Meridian Mutual. You handle two different
-kinds of request, and you must tell them apart from the input itself, not
-from any label the caller gives you:
+# Which prompt/tool subset a call gets is decided once, in run(), by a
+# deterministic regex check on the input (CLAIM_ID_PATTERN) - not by asking
+# the model to infer it from a combined prompt covering both jobs. That
+# combined-prompt design (m1) was the actual cause of the token-budget
+# regression described above; the model never had trouble telling the two
+# jobs apart once given get_claim, it just paid for both jobs' instructions
+# and tools on every call it made either way.
 
-- A general policy question (no claim ID mentioned) - answer it from the
-  policy documents alone. Never call get_claim or compute_payout for this.
-- A specific claim to triage - the input names a claim ID in the form
-  CLM-#### (e.g. "CLM-2001"). Pull the claim record first, investigate, and
-  decide the coverage outcome and payout.
+QUESTION_SYSTEM_PROMPT = """
+You are a claims assistant for Meridian Mutual, answering a general policy
+question from the policy documents alone.
 
-Live bug this rule exists to prevent: before this agent had get_claim at
-all, asking it "CLM-2001" as if it were a policy question made it search
-for the literal string "CLM-2001", get nothing useful, reformulate the same
-dead-end query four more times, and burn its entire token budget without
-ever finishing. The fix is not a smarter search - it is recognizing a claim
-ID and switching to the triage tools instead of treating everything as a
-document-search problem.
-
-Rules for a policy question:
+Rules:
 1. Call one tool per turn.
 2. Do not call `finish` until every distinct part of the question has been
    checked - a question naming two endorsements needs both looked up, not
@@ -127,8 +130,13 @@ Rules for a policy question:
 4. Cite sources by file name and heading. Never invent a fact that did not
    appear in a tool result. Leave `decision` and `payout` unset.
 5. Keep the final answer brief - two or three sentences.
+"""
 
-Rules for a claim triage:
+TRIAGE_SYSTEM_PROMPT = f"""
+You are a claims assistant for Meridian Mutual, triaging one specific claim:
+decide the coverage outcome and the payout, using only the tools available.
+
+Rules:
 1. Call one tool per turn.
 2. Always call get_claim first, to see the claimed amount, the policy form
    and endorsements attached, and the adjuster's notes. The notes often
@@ -144,15 +152,6 @@ Rules for a claim triage:
    the claim actually calls for it, not on every claim:
    - check_settlement_authority, after compute_payout, if the payout is
      large enough that who can approve it matters.
-   - check_subrogation_required if a third party (a contractor, a utility, a
-     manufacturer) may be responsible for the loss.
-   - calculate_acv_depreciation only for a roof loss where search_policy
-     confirms the cause of loss is wind or hail (never for any other cause).
-   - get_special_sublimit for a claim naming a specific high-value item
-     category (jewelry, firearms, cash, etc.) that is not separately
-     scheduled.
-   - validate_denial_letter before finishing a "denied" decision that will
-     be sent as a formal denial letter.
    - flag_for_review, instead of finish, only if the claim genuinely cannot
      be resolved from the tools available (contradictory notes, a document
      the corpus doesn't have) - not as a shortcut to avoid deciding.
@@ -192,9 +191,13 @@ class ClaimAgent:
         if self.client is None:
             raise LLMNotConfiguredError()
 
+        is_triage = bool(CLAIM_ID_PATTERN.match(user_input.strip()))
+        tools = TRIAGE_TOOL_SCHEMAS if is_triage else QUESTION_TOOL_SCHEMAS
+        system_prompt = TRIAGE_SYSTEM_PROMPT if is_triage else QUESTION_SYSTEM_PROMPT
+
         started = time.perf_counter()
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_input},
         ]
 
@@ -205,6 +208,7 @@ class ClaimAgent:
         decision = None
         payout = None
         sources: list[str] = []
+        compute_payout_called = False
 
         try:
             for iteration in range(1, max_iterations + 1):
@@ -220,7 +224,7 @@ class ClaimAgent:
                     raise AgentStoppedError("cost_limit")
 
                 step_started = time.perf_counter()
-                tool_name, args, result, raw_text, call_tokens = self._next_action(messages)
+                tool_name, args, result, raw_text, call_tokens, call_id = self._next_action(messages, tools)
                 tokens_used += call_tokens
                 latency_ms = int((time.perf_counter() - step_started) * 1000)
 
@@ -239,8 +243,36 @@ class ClaimAgent:
                     break
 
                 if tool_name == "finish":
+                    proposed_decision = str(args["decision"]).strip().lower() if args.get("decision") else None
+
+                    # Mitigation for the "skipped_required_tool" failure mode
+                    # (live-observed on CLM-2003/CLM-2004: the model finished
+                    # a triage claim - decision and payout both set - having
+                    # never called compute_payout at all, asserting the
+                    # payout instead of computing it). Rejected exactly like
+                    # a bad tool call already is: a role:tool error message
+                    # goes back, and the loop continues rather than accepting
+                    # an incomplete trajectory as done.
+                    if proposed_decision is not None and not compute_payout_called:
+                        steps.append({
+                            "step": iteration, "thought": raw_text,
+                            "tool": "finish (rejected - compute_payout not yet called)", "args": args,
+                            "result": None, "latency_ms": latency_ms, "tokens": call_tokens,
+                        })
+                        messages.append({
+                            "role": "tool", "tool_call_id": call_id,
+                            "content": json.dumps({
+                                "error": "finish was rejected: you set a coverage decision without ever "
+                                         "calling compute_payout. Call compute_payout now, then call finish "
+                                         "again immediately, reporting exactly the numbers it returned. Do "
+                                         "not call any other tool in between - every other fact you need, "
+                                         "you already have from earlier steps.",
+                            }),
+                        })
+                        continue
+
                     answer = str(args.get("answer") or "").strip()
-                    decision = (str(args["decision"]).strip().lower() if args.get("decision") else None)
+                    decision = proposed_decision
                     payout = args.get("payout")
                     sources = [str(s) for s in (args.get("sources") or [])]
                     steps.append({
@@ -248,6 +280,9 @@ class ClaimAgent:
                         "result": None, "latency_ms": latency_ms, "tokens": call_tokens,
                     })
                     break
+
+                if tool_name == "compute_payout" and result and "error" not in result:
+                    compute_payout_called = True
 
                 steps.append({
                     "step": iteration, "thought": raw_text, "tool": tool_name, "args": args,
@@ -302,19 +337,25 @@ class ClaimAgent:
             "agent_prompt_version": AGENT_PROMPT_VERSION,
         }
 
-    def _next_action(self, messages: list[dict]) -> tuple[str | None, dict, dict | None, str, int]:
+    def _next_action(self, messages: list[dict], tools: list[dict]) -> tuple[str | None, dict, dict | None, str, int, str | None]:
         """
-        One model call. Returns (tool_name, args, result, raw_text, tokens):
-        `result` is the executed tool's return value (None for `finish`, and
-        meaningless when tool_name is None). Mutates `messages` in place
-        with the assistant turn and, if a tool other than `finish` was
-        called, the matching `role: tool` result message the API requires
-        before the next call.
+        One model call. Returns (tool_name, args, result, raw_text, tokens,
+        call_id): `result` is the executed tool's return value (None for
+        `finish`, and meaningless when tool_name is None). `call_id` is the
+        tool call's id (None when no tool call was made) - run() needs it to
+        append a rejection message if it decides a `finish` call is invalid
+        (see the compute_payout precondition there) without which the API's
+        "every tool_call needs a matching tool-role reply" rule would be
+        violated on the next call. Mutates `messages` in place with the
+        assistant turn and, if a tool other than `finish` was called, the
+        matching `role: tool` result message the API requires before the
+        next call. `tools` is the job-scoped subset run() picked - see
+        AGENT_PROMPT_VERSION's m2 comment for why this isn't TOOL_SCHEMAS.
         """
 
         response = create_completion_with_retry(
             self.client, model=settings.MODEL_NAME, messages=messages,
-            tools=TOOL_SCHEMAS, temperature=TEMPERATURE, max_tokens=MAX_TOKENS_PER_CALL,
+            tools=tools, temperature=TEMPERATURE, max_tokens=MAX_TOKENS_PER_CALL,
         )
 
         message = response.choices[0].message
@@ -323,7 +364,7 @@ class ClaimAgent:
 
         if not tool_calls:
             messages.append({"role": "assistant", "content": message.content or ""})
-            return None, {}, None, message.content or "", tokens
+            return None, {}, None, message.content or "", tokens, None
 
         # One action per turn: only the first tool call is executed, even
         # if the model offered several - keeps one step meaning one action,
@@ -352,7 +393,7 @@ class ClaimAgent:
                 "content": json.dumps(result, ensure_ascii=False)[:2000],
             })
 
-        return call.function.name, args, result, message.content or "", tokens
+        return call.function.name, args, result, message.content or "", tokens, call.id
 
     def _call_tool(self, tool_name: str, args: dict) -> dict:
 
@@ -370,18 +411,6 @@ class ClaimAgent:
 
         if tool_name == "check_settlement_authority":
             return check_settlement_authority(args)
-
-        if tool_name == "check_subrogation_required":
-            return check_subrogation_required(args)
-
-        if tool_name == "calculate_acv_depreciation":
-            return calculate_acv_depreciation(args)
-
-        if tool_name == "get_special_sublimit":
-            return get_special_sublimit(args)
-
-        if tool_name == "validate_denial_letter":
-            return validate_denial_letter(args)
 
         if tool_name == "flag_for_review":
             return flag_for_review(args)

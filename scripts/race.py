@@ -225,7 +225,14 @@ def run_triage_suite(agent: ClaimAgent, workflow: FixedClaimWorkflow, only: list
 
     claim_ids = only if only else all_claim_ids()
 
-    results = []
+    # Accumulate onto whatever's already saved, keyed by claim_id, rather
+    # than starting from empty each call - so a deliberate one-claim-at-a-
+    # time run (`--only CLM-2001`, then `--only CLM-2002`, ...) builds up the
+    # full 10-claim result set instead of each call discarding the last.
+    results_by_id: dict[str, dict] = {}
+    if TRIAGE_RESULTS_PATH.exists():
+        for r in json.loads(TRIAGE_RESULTS_PATH.read_text(encoding="utf-8")):
+            results_by_id[r["claim_id"]] = r
 
     for i, claim_id in enumerate(claim_ids):
         if i > 0 and sleep:
@@ -239,13 +246,16 @@ def run_triage_suite(agent: ClaimAgent, workflow: FixedClaimWorkflow, only: list
         print(f"[{claim_id}]{' (dependent)' if dependent else ''} racing ...", end="", flush=True)
         started = time.perf_counter()
         result = run_triage_claim(claim_id, agent, workflow, expected)
-        results.append(result)
+        results_by_id[claim_id] = result
         print(f" done ({time.perf_counter() - started:.1f}s) "
               f"agent={'PASS' if result['agent']['passed'] else 'FAIL'} "
               f"fixed={'PASS' if result['workflow']['passed'] else 'FAIL'}")
 
         TRIAGE_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        TRIAGE_RESULTS_PATH.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+        ordered = [results_by_id[c] for c in all_claim_ids() if c in results_by_id]
+        TRIAGE_RESULTS_PATH.write_text(json.dumps(ordered, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    results = [results_by_id[c] for c in all_claim_ids() if c in results_by_id]
 
     if not results:
         print("No claims completed.")

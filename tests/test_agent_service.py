@@ -17,16 +17,13 @@ from groq import GroqError
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
 from app.services.agent_service import ClaimAgent
 from app.services.agent_tools import (
-    calculate_acv_depreciation,
+    TOOL_SCHEMAS,
     check_settlement_authority,
-    check_subrogation_required,
     compute_payout,
     flag_for_review,
     get_claim,
-    get_special_sublimit,
     list_documents,
     search_policy,
-    validate_denial_letter,
 )
 from app.services.fixed_claim_workflow import FixedClaimWorkflow
 
@@ -78,9 +75,11 @@ class _FakeCompletions:
         self._queue = list(scripted)
         self.tokens_each = tokens_each
         self.calls: list[list[dict]] = []
+        self.tools_sent: list[list[dict]] = []
 
     def create(self, **kwargs):
         self.calls.append(kwargs["messages"])
+        self.tools_sent.append(kwargs.get("tools"))
         if not self._queue:
             raise AssertionError("fake Groq client ran out of scripted responses")
         item = self._queue.pop(0)
@@ -191,6 +190,23 @@ def test_search_policy_reports_no_hits_cleanly():
     assert "No chunks found" in result["result"]
 
 
+def test_search_policy_schema_does_not_invite_settlement_authority_checks():
+
+    # Regression test: found live - search_policy's own description used to
+    # cite "settlement authority" as an example reason to search policy
+    # text, contradicting the existence of check_settlement_authority. The
+    # model followed that description literally: given CLM-2001 (a $5,500
+    # payout needing no authority check at all), it searched policy text for
+    # "settlement authority payout 5500" instead of using the dedicated
+    # tool - a wasted step that helped exhaust the token budget before the
+    # run could reach `finish`.
+    schema = next(s for s in TOOL_SCHEMAS if s["function"]["name"] == "search_policy")
+    description = schema["function"]["description"].lower()
+
+    assert "settlement authority" not in description or "never use this to check" in description
+    assert "check_settlement_authority" in description
+
+
 def test_search_policy_resolves_a_guessed_endorsement_code_to_the_real_file_name():
 
     # Regression test: found live running the Task Set D triage extension -
@@ -264,81 +280,46 @@ def test_check_settlement_authority_picks_the_lowest_covering_grade():
     assert check_settlement_authority({"payout_amount": 2_000_000})["result"]["required_grade"] == "head_of_claims"
 
 
-def test_check_subrogation_required_on_amount_threshold():
-
-    result = check_subrogation_required({"payout_amount": 6000, "cause_of_loss": "wear and tear"})
-
-    assert result["result"]["subrogation_required"] is True
-
-
-def test_check_subrogation_required_on_trigger_phrase_below_threshold():
-
-    result = check_subrogation_required({"payout_amount": 2000, "cause_of_loss": "contractor excavation nicked the line"})
-
-    assert result["result"]["subrogation_required"] is True
-
-
-def test_check_subrogation_not_required_below_threshold_with_no_trigger():
-
-    result = check_subrogation_required({"payout_amount": 1000, "cause_of_loss": "accidental breakage"})
-
-    assert result["result"]["subrogation_required"] is False
-
-
-def test_calculate_acv_depreciation_caps_at_the_maximum():
-
-    result = calculate_acv_depreciation({"replacement_cost": 20000, "roof_material": "composition_shingle", "roof_age_years": 30})
-
-    assert result["result"]["depreciation_pct"] == 0.80
-    assert result["result"]["acv"] == 4000.0
-
-
-def test_calculate_acv_depreciation_rejects_an_unknown_material():
-
-    result = calculate_acv_depreciation({"replacement_cost": 1000, "roof_material": "thatch", "roof_age_years": 5})
-
-    assert "error" in result
-
-
-def test_get_special_sublimit_returns_the_base_form_ceiling():
-
-    result = get_special_sublimit({"item_category": "jewelry_watches_furs_theft", "is_scheduled": False})
-
-    assert result["result"]["sublimit"] == 2000
-
-
-def test_get_special_sublimit_is_bypassed_once_scheduled():
-
-    result = get_special_sublimit({"item_category": "jewelry_watches_furs_theft", "is_scheduled": True})
-
-    assert result["result"]["sublimit"] is None
-
-
-def test_validate_denial_letter_lists_missing_requirements():
-
-    result = validate_denial_letter({"has_second_adjuster_review": True, "cites_specific_paragraph": False})
-
-    assert result["result"]["ready_to_issue"] is False
-    assert "cites_specific_paragraph" in result["result"]["missing_requirements"]
-    assert "second_adjuster_review" not in result["result"]["missing_requirements"]
-
-
-def test_validate_denial_letter_ready_when_all_five_present():
-
-    result = validate_denial_letter({
-        "has_second_adjuster_review": True, "cites_specific_paragraph": True,
-        "has_plain_language_explanation": True, "has_appeal_route": True, "evidence_retained": True,
-    })
-
-    assert result["result"]["ready_to_issue"] is True
-    assert result["result"]["missing_requirements"] == []
-
-
 def test_flag_for_review_needs_both_fields():
 
     assert "error" in flag_for_review({"claim_id": "CLM-2001"})
     assert "error" in flag_for_review({"reason": "contradictory notes"})
     assert "result" in flag_for_review({"claim_id": "CLM-2001", "reason": "contradictory notes"})
+
+
+# -------------------------------------------------------------- tool scoping
+
+def test_agent_sends_only_question_tools_for_a_policy_question():
+
+    # Regression test: the merged agent used to send all 11 tool schemas
+    # plus both jobs' system-prompt rules on every call, roughly doubling
+    # the per-call cost of either original agent - a live run on CLM-2001
+    # burned 17,204 tokens across 5 steps and never reached `finish`.
+    client = _FakeGroqClient([
+        tool_call_message("finish", {"answer": "done", "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent.run("What is the deductible for a water backup claim?")
+
+    sent_names = {schema["function"]["name"] for schema in client.chat.completions.tools_sent[0]}
+    assert sent_names == {"search_policy", "list_documents", "finish"}
+
+
+def test_agent_sends_only_triage_tools_for_a_claim_id():
+
+    client = _FakeGroqClient([
+        tool_call_message("compute_payout", {"claimed_amount": 6000, "excess_amount": 500, "claim_status": "approved"}),
+        tool_call_message("finish", {"answer": "done", "decision": "approved", "payout": 5500, "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent.run("CLM-2001")
+
+    sent_names = {schema["function"]["name"] for schema in client.chat.completions.tools_sent[0]}
+    assert "get_claim" in sent_names
+    assert "compute_payout" in sent_names
+    assert "list_documents" not in sent_names  # not a triage tool - shouldn't be sent
 
 
 # ------------------------------------------------------- agent: policy question
@@ -478,6 +459,60 @@ def test_agent_can_use_a_further_triage_tool_before_finishing():
     assert authority_step["result"]["result"]["required_grade"] == "senior_field_adjuster"
 
 
+def test_agent_rejects_a_finish_call_that_skips_compute_payout():
+
+    # Week 8 mitigation for the "skipped_required_tool" failure mode -
+    # live-observed on CLM-2003/CLM-2004: the model finished a triage claim
+    # (decision + payout both set) having never called compute_payout at
+    # all, asserting the payout instead of computing it. finish is now
+    # rejected exactly like a bad tool call, and the loop must continue
+    # rather than accept an incomplete trajectory as done.
+    client = _FakeGroqClient([
+        tool_call_message("get_claim", {"claim_id": "CLM-2003"}),
+        tool_call_message("search_policy", {"query": "warranty exclusion"}),
+        tool_call_message("finish", {"answer": "Denied.", "decision": "denied", "payout": 0, "sources": []}),
+        tool_call_message("compute_payout", {"claimed_amount": 4200, "excess_amount": 0, "claim_status": "denied"}),
+        tool_call_message("finish", {"answer": "Denied.", "decision": "denied", "payout": 0, "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    result = agent.run("CLM-2003")
+
+    assert result["finished"] is True
+    assert result["decision"] == "denied"
+    assert result["payout"] == 0
+    rejected_step = next(s for s in result["steps"] if "rejected" in s["tool"])
+    assert rejected_step is not None
+    assert [s["tool"] for s in result["steps"]][-1] == "finish"
+
+
+def test_finish_rejection_message_forbids_extra_tool_calls_before_retrying():
+
+    # Regression test: a live CLM-2001 run showed the model correctly
+    # calling compute_payout after a rejection, but then redundantly
+    # re-calling check_settlement_authority (identical args/result to an
+    # earlier step) instead of retrying finish - wasting a step and helping
+    # exhaust the token budget. The rejection message is refined (not a
+    # second mitigation - the same gate's wording) to explicitly say not to
+    # call any other tool in between.
+    client = _FakeGroqClient([
+        tool_call_message("get_claim", {"claim_id": "CLM-2003"}),
+        tool_call_message("finish", {"answer": "Denied.", "decision": "denied", "payout": 0, "sources": []}),
+        tool_call_message("compute_payout", {"claimed_amount": 4200, "excess_amount": 0, "claim_status": "denied"}),
+        tool_call_message("finish", {"answer": "Denied.", "decision": "denied", "payout": 0, "sources": []}),
+    ])
+
+    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent.run("CLM-2003")
+
+    last_call_messages = client.chat.completions.calls[-1]
+    rejection_messages = [
+        m["content"] for m in last_call_messages
+        if m.get("role") == "tool" and "error" in m.get("content", "")
+    ]
+    assert any("do not call any other tool" in m.lower() for m in rejection_messages)
+
+
 def test_agent_flag_for_review_ends_the_run_as_escalated_not_decided():
 
     client = _FakeGroqClient([
@@ -495,6 +530,17 @@ def test_agent_flag_for_review_ends_the_run_as_escalated_not_decided():
 
 
 # ------------------------------------------------------------------ 4 budgets
+
+def test_default_max_tokens_covers_a_full_six_step_triage_run():
+
+    # Regression test: two live CLM-2001 runs (14,539 and 14,204 tokens)
+    # both hit the old 14000 default on a legitimate, non-redundant 5-step
+    # trajectory - one call short of `finish`. Guards against silently
+    # dropping the budget back below what a real 6-step run needs.
+    from app.services.agent_service import DEFAULT_MAX_TOKENS
+
+    assert DEFAULT_MAX_TOKENS >= 16000
+
 
 def test_agent_enforces_the_iteration_limit():
 
@@ -573,6 +619,7 @@ def test_agent_survives_repeated_output_parse_failures():
         GroqError("Parsing failed. The model generated output that could not be parsed."),
         GroqError("Parsing failed. The model generated output that could not be parsed."),
         GroqError("Parsing failed. The model generated output that could not be parsed."),
+        tool_call_message("compute_payout", {"claimed_amount": 8000, "excess_amount": 0, "claim_status": "approved"}),
         tool_call_message("finish", {"answer": "Recovered.", "decision": "approved", "payout": 8000, "sources": []}),
     ])
 

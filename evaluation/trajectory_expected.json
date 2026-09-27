@@ -1,0 +1,106 @@
+[
+  {
+    "claim_id": "CLM-2001",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "check_settlement_authority", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "check_settlement_authority", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Water backup, sump in working order, no flood. Originally asserted as a single-search case only - a live run showed this was over-brittle: a real, correct run split 'is this covered' and 'what's the deductible' into two genuinely different searches, which is reasonable practice, not inefficiency. Now accepted as a set (1 or 2 searches) like every other claim; 3+ is still flagged as redundant_search. A further live run (post settlement-authority-description fix) showed a legitimate optional check_settlement_authority call before compute_payout on this claim's $5,500 payout - added as two more accepted variants rather than forced as a sequencing failure."
+  },
+  {
+    "claim_id": "CLM-2002",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Dependent (flood-vs-backup). A second, more specific search after the notes reveal the flood cause is a legitimate refinement, not a mistake - asserted as a set, not forced to one exact sequence."
+  },
+  {
+    "claim_id": "CLM-2003",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Dependent (manufacturer's-warranty exclusion). Same reasoning as CLM-2002 - a follow-up search once the warranty detail is noticed is legitimate."
+  },
+  {
+    "claim_id": "CLM-2004",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Power-surge breakdown, no warranty conflict. Same 1-or-2-search allowance as every other claim (see CLM-2001's note for why the original single-search-only assertion was wrong)."
+  },
+  {
+    "claim_id": "CLM-2005",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Dependent (gradual wear-and-tear, no endorsement). A second search to confirm no equipment-breakdown endorsement is attached is a legitimate check, not padding."
+  },
+  {
+    "claim_id": "CLM-2006",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Service line failure, standard deductible. Same 1-or-2-search allowance as every other claim."
+  },
+  {
+    "claim_id": "CLM-2007",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "compute_payout", "check_settlement_authority", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "check_settlement_authority", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Dependent (fire-vs-wind/hail ACV restriction), AND the only claim large enough ($119,000) that checking settlement authority genuinely matters - both a second search and an authority check are legitimate, neither is required. steps_needed stays 4 (the authority check is optional diligence, not a requirement, so it is not counted against step efficiency as a penalty when present)."
+  },
+  {
+    "claim_id": "CLM-2008",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Identity fraud deductible. Same 1-or-2-search allowance as every other claim."
+  },
+  {
+    "claim_id": "CLM-2009",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Intentional-loss exclusion - a plain base-exclusion denial. Same 1-or-2-search allowance as every other claim."
+  },
+  {
+    "claim_id": "CLM-2010",
+    "expected_sequences": [
+      ["get_claim", "search_policy", "compute_payout", "finish"],
+      ["get_claim", "search_policy", "search_policy", "compute_payout", "finish"]
+    ],
+    "steps_needed": 4,
+    "must_include": ["search_policy", "compute_payout"],
+    "note": "Dependent (scheduled-property sub-limit bypass). A follow-up search to confirm the base form's jewelry sub-limit doesn't apply once scheduled is a legitimate check."
+  }
+]
