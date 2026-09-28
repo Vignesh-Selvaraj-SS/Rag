@@ -1,0 +1,135 @@
+<div class="page">
+  <app-page-header
+    title="Agent"
+    subtitle="Ask a policy question, or give a claim id (CLM-####) to triage - run the agent and the fixed workflow side by side and watch the path each one took, not just the final answer."
+  />
+
+  <div class="ask-form">
+    <textarea
+      class="input textarea"
+      rows="3"
+      placeholder="e.g. What is the deductible for a water backup claim under HO-2026-01? — or a claim id like CLM-2007"
+      [value]="userInput()"
+      (input)="userInput.set($any($event.target).value)"
+      (keydown.enter)="onEnter($event)"
+      [disabled]="running()"
+    ></textarea>
+    <div class="row row--between">
+      <div class="samples">
+        @for (sample of samples; track sample) {
+          <button type="button" class="chip" [disabled]="running()" (click)="useSample(sample)">{{ sample }}</button>
+        }
+        @if (!claimsLoading()) {
+          @for (claim of claims(); track claim.claim_id) {
+            <button type="button" class="chip chip--claim" [disabled]="running()" (click)="useSample(claim.claim_id)">{{ claim.claim_id }}</button>
+          }
+        }
+      </div>
+      <select
+        class="select"
+        aria-label="Which system to run"
+        [value]="system()"
+        (change)="system.set($any($event.target).value)"
+        [disabled]="running()"
+      >
+        <option value="both">Both</option>
+        <option value="agent">Agent only</option>
+        <option value="workflow">Fixed workflow only</option>
+      </select>
+      <button type="button" class="btn btn--primary" [disabled]="running() || !userInput().trim()" (click)="run()">
+        {{ running() ? 'Running…' : 'Run' }}
+      </button>
+    </div>
+    <p class="faint small">Enter to run · Shift+Enter for a new line</p>
+  </div>
+
+  @if (runError()) {
+    <app-error-state title="Run could not complete" [error]="runError()" (retry)="retry()" />
+  }
+
+  @if (running()) {
+    <app-loading-indicator message="Running…" />
+  } @else if (!result()) {
+    <app-empty-state
+      icon="🧭"
+      title="No run yet"
+      description="Type a question or a claim id above (or pick a sample), choose which system(s) to run, and click Run to see the full step-by-step trace."
+    />
+  } @else if (result(); as r) {
+    <div class="grid grid--agent">
+      @if (r.agent; as agent) {
+        <section class="trace-card">
+          <h2>Agent</h2>
+          <ng-container *ngTemplateOutlet="systemSummary; context: { $implicit: agent }" />
+          <ng-container *ngTemplateOutlet="systemSteps; context: { $implicit: agent }" />
+        </section>
+      }
+      @if (r.workflow; as workflow) {
+        <section class="trace-card">
+          <h2>Fixed workflow</h2>
+          <ng-container *ngTemplateOutlet="systemSummary; context: { $implicit: workflow }" />
+          <ng-container *ngTemplateOutlet="systemSteps; context: { $implicit: workflow }" />
+        </section>
+      }
+    </div>
+  }
+</div>
+
+<ng-template #systemSummary let-sys>
+  @if (sys.error) {
+    <div class="notice notice--warning">{{ sys.error }}</div>
+  } @else {
+    @if (sys.decision) {
+      <div class="row row--between">
+        <span [class]="decisionClass(sys.decision)">{{ sys.decision }}</span>
+        <span class="payout">{{ sys.payout !== null ? '$' + (sys.payout | number: '1.0-2') : '—' }}</span>
+      </div>
+    }
+    <p class="answer">{{ sys.answer || '(no answer)' }}</p>
+
+    <div class="grid grid--stats">
+      <div class="stat">
+        <span class="stat__label">Steps</span>
+        <span class="stat__value">{{ sys.step_count }}</span>
+        <span class="stat__hint">{{ sys.stopped_reason }}</span>
+      </div>
+      <div class="stat">
+        <span class="stat__label">Tokens</span>
+        <span class="stat__value">{{ sys.tokens_used }}</span>
+        <span class="stat__hint">${{ sys.cost_usd | number: '1.5-5' }}</span>
+      </div>
+      <div class="stat">
+        <span class="stat__label">Latency</span>
+        <span class="stat__value">{{ sys.latency_ms }}ms</span>
+        <span class="stat__hint">{{ sys.finished ? 'finished' : 'did not finish' }}</span>
+      </div>
+    </div>
+
+    @if (sys.sources.length) {
+      <p class="muted small">Sources: {{ sys.sources.join(', ') }}</p>
+    }
+  }
+</ng-template>
+
+<ng-template #systemSteps let-sys>
+  <ol class="steps">
+    @for (step of sys.steps; track step.step) {
+      <li class="step">
+        <div class="step__header">
+          <span class="step__index">{{ step.step }}</span>
+          <span class="step__tool">{{ step.tool }}</span>
+          <span class="muted small">{{ step.latency_ms }}ms @if (step.tokens) { · {{ step.tokens }} tok }</span>
+        </div>
+        @if (step.thought) {
+          <p class="step__thought muted small">{{ step.thought }}</p>
+        }
+        @if (step.args) {
+          <pre class="mono step__block">{{ pretty(step.args) }}</pre>
+        }
+        @if (step.result) {
+          <pre class="mono step__block step__block--result">{{ pretty(step.result) }}</pre>
+        }
+      </li>
+    }
+  </ol>
+</ng-template>

@@ -8,6 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
 from app import __version__
+from app.api.agent import router as agent_router
 from app.api.chat import router as chat_router
 from app.api.documents import router as documents_router
 from app.api.evaluation import router as evaluation_router
@@ -79,6 +80,7 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
     app.include_router(documents_router)
     app.include_router(evaluation_router)
     app.include_router(traces_router)
+    app.include_router(agent_router)
 
     dist = settings.FRONTEND_DIST if frontend_dist is None else frontend_dist
 

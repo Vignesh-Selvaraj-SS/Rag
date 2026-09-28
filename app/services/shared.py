@@ -13,6 +13,8 @@ from app.core.config import settings
 from app.services.document_service import DocumentService
 from app.services.eval_service import EvalService
 from app.services.evaluation_service import EvaluationService
+from app.services.agent_service import ClaimAgent
+from app.services.fixed_claim_workflow import FixedClaimWorkflow
 from app.services.index_metadata import IndexMetadata
 from app.services.judge_service import JudgeService
 from app.services.rag_service import RAGService
@@ -68,3 +70,19 @@ def get_eval_service() -> EvalService:
         eval_set_path=settings.eval_set_path,
         runs_dir=settings.eval_runs_dir,
     )
+
+
+# Both share get_rag_service().retriever rather than building their own
+# RetrievalService - the embedded Qdrant store locks its data folder to a
+# single client, so a second instance in the same process would crash on
+# startup exactly like a second process would (see this module's docstring).
+
+
+@lru_cache(maxsize=1)
+def get_agent() -> ClaimAgent:
+    return ClaimAgent(retriever=get_rag_service().retriever)
+
+
+@lru_cache(maxsize=1)
+def get_fixed_workflow() -> FixedClaimWorkflow:
+    return FixedClaimWorkflow(retriever=get_rag_service().retriever)

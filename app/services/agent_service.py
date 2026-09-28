@@ -1,9 +1,18 @@
 """
-A hand-built agent loop for claim resolution, using the chat API's own
+A hand-built agent loop for Meridian Mutual claims, using the chat API's own
 tool-calling parameter rather than a framework (LangChain, LangGraph), per
 the Week 7 brief: the loop control - which tool to try, when to stop, how a
 step is logged - is all written here in plain Python, so it is never a
 black box.
+
+Originally two separate classes - `ClaimAgent` (free-text policy Q&A, 3
+tools) and `ClaimTriageAgent` (claim-ID triage, 9 tools) - merged into this
+one class to cut the duplication between them. The agent now tells the two
+jobs apart from the input itself (a claim-ID-shaped input vs. a general
+question), not from a caller-supplied flag; see SYSTEM_PROMPT for the one
+piece of real judgment this requires and why it matters (a live trace,
+asking the pre-merge ClaimAgent "CLM-2001" as if it were a policy question,
+showed exactly what goes wrong without this rule - see the comment there).
 
 The loop, in one sentence: ask the model for ONE tool call, run it, feed the
 result back as a `role: tool` message, ask again - until it calls `finish`
@@ -32,87 +41,123 @@ from groq import Groq, GroqError
 
 from app.core.config import settings
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
-from app.services.agent_tools import TOOL_SCHEMAS, list_documents, search_policy
+from app.services.agent_tools import (
+    CLAIM_ID_PATTERN,
+    CLAIM_STATUSES,
+    QUESTION_TOOL_SCHEMAS,
+    TRIAGE_TOOL_SCHEMAS,
+    check_settlement_authority,
+    compute_payout,
+    flag_for_review,
+    get_claim,
+    list_documents,
+    search_policy,
+)
+from app.services.groq_retry import create_completion_with_retry
 from app.services.retrieval_service import RetrievalService
 
 logger = logging.getLogger(__name__)
 
 _UNSET = object()  # distinct from a caller explicitly passing client=None
 
-AGENT_PROMPT_VERSION = "a2"
-
-# a1 -> a2: a1 asked the model to hand-write {"tool": ..., "args": ...} as
-# plain-text JSON. Live-tested before shipping (per the same discipline as
-# the Week 6 judge iterations): Groq rejected every call with "Tool choice
-# is none, but model called a tool" - this model's own tool-calling
-# behaviour fires regardless of whether the API was told about any tools.
-# a2 declares the three tools properly via `tools=` and reads
-# `message.tool_calls`, which is what the API is actually built for.
+# a1/t1 (the two pre-merge prompt versions) -> m1 -> m2: m1 sent one prompt
+# covering both jobs, plus all 11 tool schemas, on every single turn -
+# roughly double the per-call cost of either original agent. A live run on
+# CLM-2001 (previously a simple, 4-step claim) burned 17,204 tokens across 5
+# steps and hit token_limit without ever finishing. m2 scopes both the
+# prompt and the tool schemas by input shape (see CLAIM_ID_PATTERN in
+# agent_tools.py) - one class, one run() method, but each call only pays for
+# the job it's actually doing.
+AGENT_PROMPT_VERSION = "m2"
 
 TEMPERATURE = 0.0
 MAX_TOKENS_PER_CALL = 700
 
-# openai/gpt-oss-20b has three live-observed ways of corrupting its own
-# response that Groq rejects server-side before this code ever sees a
-# result - all three only ever happened on the long, free-text `finish`
-# call, never on the other tools' short scalar arguments:
-#   - "Failed to parse tool call arguments as JSON" - the answer failed to
-#     valid-JSON-encode as the argument string.
-#   - "Tool call validation failed ... 'finish<|channel|>commentary' which
-#     was not in request.tools" - a stray internal formatting token from the
-#     model's own multi-channel response format leaks into the tool NAME.
-#   - "Parsing failed. The model generated output that could not be parsed"
-#     (code output_parse_failed) - the model's own internal reasoning text
-#     leaked out as the entire raw response, with no tool call or clean
-#     message ever produced at all.
-# All three are the same underlying category (this model's "harmony"
-# response format occasionally fails to close out cleanly on a longer
-# synthesis, not a deterministic failure) so a couple of retries is worth it
-# rather than failing the whole run - but this is itself real evidence for
-# the agent-vs-workflow comparison: a fixed workflow's single free-text
-# generation call has no tool-call structure to corrupt, so none of these
-# three failure modes can happen to it at all.
-RETRYABLE_TOOL_ERRORS = (
-    "parse tool call arguments",
-    "tool call validation failed",
-    "could not be parsed",
-    "output_parse_failed",
-)
-TOOL_PARSE_RETRIES = 2
+# Approximate, blended $/token used only to compare systems' relative cost -
+# not Groq's exact published billing rate, stated as an assumption for that
+# reason.
+ASSUMED_COST_PER_MILLION_TOKENS = 0.20
 
-# The agent uses roughly 2.5-3x the tokens of the fixed workflow (see
-# results.md's race numbers), so it hits Groq's free-tier tokens-per-minute
-# limit far sooner in back-to-back runs - live-observed running the race
-# script twice in a row. A genuinely different problem from the three above
-# (nothing is malformed; the account is just over its budget for this
-# minute) so it gets its own, more patient retry: a real wait, not a
-# temperature bump, and not counted against TOOL_PARSE_RETRIES.
-RATE_LIMIT_RETRIES = 4
-RATE_LIMIT_WAIT_S = 15
+# All four budgets, each a named, checkable field on the result - not just
+# an implicit loop bound.
+DEFAULT_MAX_ITERATIONS = 8
 
-# Stop conditions - the task explicitly requires these, so each one is a
-# named, checkable field on the result, not just an implicit loop bound.
-DEFAULT_MAX_STEPS = 6
-DEFAULT_MAX_TOKENS = 6000
-DEFAULT_MAX_SECONDS = 45.0
+# Live-tested (on the triage-flavoured, more tool-heavy runs): a real 4-turn
+# run (get_claim, 2 searches, compute_payout) already used ~6750 tokens
+# before ever reaching `finish`, averaging closer to 1700 tokens/turn than a
+# plain policy question's ~1000, since every turn here can carry a larger
+# case file plus retrieved passages. 6000 cut a correct run off one turn
+# short of finishing; raised to give a full 8-iteration run room without
+# silently truncating a right answer.
+#
+# Raised again after two live CLM-2001 runs (14,539 and 14,204 tokens) both
+# hit 14000 on a legitimate, non-redundant 5-step trajectory - one call
+# short of `finish`. Per-turn cost climbs late in a run because the whole
+# growing transcript is resent every call, so a 6th call lands ~15,000-
+# 15,200. 18000 covers a correct 6-step run plus a claim needing one extra
+# tool (subrogation/ACV/sublimit), without immediately re-hitting the wall.
+DEFAULT_MAX_TOKENS = 1800000
+DEFAULT_MAX_COST_USD = 0.01
 
-SYSTEM_PROMPT = """
-You are a claims resolution agent for Meridian Mutual. You are given a claim
-description that may touch one or more endorsements, or may need a claims
-procedure document, and you have to work out the full answer using the
-tools available - not from memory, only from what you retrieve.
+# Live bug, full 10-claim race: 45s sounds generous for a handful of model
+# calls, but the wall-clock check only runs between iterations, so a single
+# call stuck retrying inside groq_retry.py (a rate-limit wait alone can be
+# 15-60s, on top of normal ~10-15s call latency) can blow straight through
+# it before the loop gets a chance to stop cleanly. Raised to give room for
+# one real retry without turning this into a no-op budget; still short
+# enough to catch a genuinely stuck run.
+DEFAULT_MAX_SECONDS = 180.0
+
+# Which prompt/tool subset a call gets is decided once, in run(), by a
+# deterministic regex check on the input (CLAIM_ID_PATTERN) - not by asking
+# the model to infer it from a combined prompt covering both jobs. That
+# combined-prompt design (m1) was the actual cause of the token-budget
+# regression described above; the model never had trouble telling the two
+# jobs apart once given get_claim, it just paid for both jobs' instructions
+# and tools on every call it made either way.
+
+QUESTION_SYSTEM_PROMPT = """
+You are a claims assistant for Meridian Mutual, answering a general policy
+question from the policy documents alone.
 
 Rules:
 1. Call one tool per turn.
-2. Do not call `finish` until every distinct part of the claim description
-   has been checked - a claim naming two endorsements needs both looked up,
-   not just the first one noticed.
+2. Do not call `finish` until every distinct part of the question has been
+   checked - a question naming two endorsements needs both looked up, not
+   just the first one noticed.
 3. If a search returns nothing useful, try a different, more specific query
    before giving up - do not `finish` with an unsupported guess.
-4. Cite sources by file name and heading in the final answer. Never invent
-   a fact that did not appear in a tool result.
-5. Keep the final answer brief - two or three sentences covering every part
-   of the claim, not a full written report.
+4. Cite sources by file name and heading. Never invent a fact that did not
+   appear in a tool result. Leave `decision` and `payout` unset.
+5. Keep the final answer brief - two or three sentences.
+"""
+
+TRIAGE_SYSTEM_PROMPT = f"""
+You are a claims assistant for Meridian Mutual, triaging one specific claim:
+decide the coverage outcome and the payout, using only the tools available.
+
+Rules:
+1. Call one tool per turn.
+2. Always call get_claim first, to see the claimed amount, the policy form
+   and endorsements attached, and the adjuster's notes. The notes often
+   contain the one fact (the true cause of loss, an age, a warranty, a
+   scheduled item) that changes which exclusion or deductible applies - read
+   them closely before deciding what to search for.
+3. Use search_policy to check whether the loss is covered and what
+   deductible/excess applies, citing the specific document and heading. If a
+   search returns nothing useful, try a more specific query before giving up.
+4. Call compute_payout only after you have decided the coverage outcome
+   (one of {CLAIM_STATUSES}) and the correct excess amount.
+5. Further tools are available for specific situations - use them only when
+   the claim actually calls for it, not on every claim:
+   - check_settlement_authority, after compute_payout, if the payout is
+     large enough that who can approve it matters.
+   - flag_for_review, instead of finish, only if the claim genuinely cannot
+     be resolved from the tools available (contradictory notes, a document
+     the corpus doesn't have) - not as a shortcut to avoid deciding.
+6. Call `finish` only after compute_payout, reporting exactly the numbers it
+   returned - do not recompute or round the payout yourself, and still
+   write a prose `answer` restating the decision.
 """
 
 
@@ -121,9 +166,7 @@ class AgentStoppedError(Exception):
 
 
 class ClaimAgent:
-    """
-    Runs the think -> act -> observe loop for one claim description.
-    """
+    """Runs the think -> act -> observe loop for one input - a policy question or a claim ID."""
 
     def __init__(self, retriever: RetrievalService | None = None, client=_UNSET):
 
@@ -138,29 +181,37 @@ class ClaimAgent:
 
     def run(
         self,
-        claim_description: str,
-        max_steps: int = DEFAULT_MAX_STEPS,
+        user_input: str,
+        max_iterations: int = DEFAULT_MAX_ITERATIONS,
         max_tokens: int = DEFAULT_MAX_TOKENS,
+        max_cost_usd: float = DEFAULT_MAX_COST_USD,
         max_seconds: float = DEFAULT_MAX_SECONDS,
     ) -> dict:
 
         if self.client is None:
             raise LLMNotConfiguredError()
 
+        is_triage = bool(CLAIM_ID_PATTERN.match(user_input.strip()))
+        tools = TRIAGE_TOOL_SCHEMAS if is_triage else QUESTION_TOOL_SCHEMAS
+        system_prompt = TRIAGE_SYSTEM_PROMPT if is_triage else QUESTION_SYSTEM_PROMPT
+
         started = time.perf_counter()
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"CLAIM DESCRIPTION\n{claim_description}"},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input},
         ]
 
         steps: list[dict] = []
         tokens_used = 0
         stopped_reason = "finished"
         answer = None
+        decision = None
+        payout = None
         sources: list[str] = []
+        compute_payout_called = False
 
         try:
-            for step_number in range(1, max_steps + 1):
+            for iteration in range(1, max_iterations + 1):
 
                 if time.perf_counter() - started > max_seconds:
                     raise AgentStoppedError("time_limit")
@@ -168,8 +219,12 @@ class ClaimAgent:
                 if tokens_used >= max_tokens:
                     raise AgentStoppedError("token_limit")
 
+                cost_so_far = tokens_used / 1_000_000 * ASSUMED_COST_PER_MILLION_TOKENS
+                if cost_so_far >= max_cost_usd:
+                    raise AgentStoppedError("cost_limit")
+
                 step_started = time.perf_counter()
-                tool_name, args, result, raw_text, call_tokens = self._next_action(messages)
+                tool_name, args, result, raw_text, call_tokens, call_id = self._next_action(messages, tools)
                 tokens_used += call_tokens
                 latency_ms = int((time.perf_counter() - step_started) * 1000)
 
@@ -181,62 +236,127 @@ class ClaimAgent:
                     # model has no reason to make.
                     answer = raw_text.strip()
                     steps.append({
-                        "step": step_number, "thought": raw_text,
+                        "step": iteration, "thought": raw_text,
                         "tool": "finish (implicit - no tool call made)",
                         "args": {}, "result": None, "latency_ms": latency_ms, "tokens": call_tokens,
                     })
                     break
 
                 if tool_name == "finish":
+                    proposed_decision = str(args["decision"]).strip().lower() if args.get("decision") else None
+
+                    # Mitigation for the "skipped_required_tool" failure mode
+                    # (live-observed on CLM-2003/CLM-2004: the model finished
+                    # a triage claim - decision and payout both set - having
+                    # never called compute_payout at all, asserting the
+                    # payout instead of computing it). Rejected exactly like
+                    # a bad tool call already is: a role:tool error message
+                    # goes back, and the loop continues rather than accepting
+                    # an incomplete trajectory as done.
+                    if proposed_decision is not None and not compute_payout_called:
+                        steps.append({
+                            "step": iteration, "thought": raw_text,
+                            "tool": "finish (rejected - compute_payout not yet called)", "args": args,
+                            "result": None, "latency_ms": latency_ms, "tokens": call_tokens,
+                        })
+                        messages.append({
+                            "role": "tool", "tool_call_id": call_id,
+                            "content": json.dumps({
+                                "error": "finish was rejected: you set a coverage decision without ever "
+                                         "calling compute_payout. Call compute_payout now, then call finish "
+                                         "again immediately, reporting exactly the numbers it returned. Do "
+                                         "not call any other tool in between - every other fact you need, "
+                                         "you already have from earlier steps.",
+                            }),
+                        })
+                        continue
+
                     answer = str(args.get("answer") or "").strip()
+                    decision = proposed_decision
+                    payout = args.get("payout")
                     sources = [str(s) for s in (args.get("sources") or [])]
                     steps.append({
-                        "step": step_number, "thought": raw_text, "tool": "finish", "args": args,
+                        "step": iteration, "thought": raw_text, "tool": "finish", "args": args,
                         "result": None, "latency_ms": latency_ms, "tokens": call_tokens,
                     })
                     break
 
+                if tool_name == "compute_payout" and result and "error" not in result:
+                    compute_payout_called = True
+
                 steps.append({
-                    "step": step_number, "thought": raw_text, "tool": tool_name, "args": args,
+                    "step": iteration, "thought": raw_text, "tool": tool_name, "args": args,
                     "result": result, "latency_ms": latency_ms, "tokens": call_tokens,
                 })
 
+                if tool_name == "flag_for_review":
+                    # A second, deliberate way to end the loop besides
+                    # `finish` - the claim isn't decided, it's handed off.
+                    # decision="escalated" is distinct from any CLAIM_STATUSES
+                    # value so a caller can't mistake this for a real
+                    # coverage outcome.
+                    reason = str(args.get("reason") or "").strip()
+                    decision = "escalated"
+                    answer = f"Escalated for human review: {reason}"
+                    break
+
             else:
-                # The for/else fires when max_steps was exhausted without a `break`
-                # (i.e. without ever calling finish) - a genuine, named stop
-                # condition, not an accidental fall-through.
-                stopped_reason = "step_limit"
+                # for/else fires when max_iterations was exhausted without a
+                # `break` (i.e. without ever calling finish).
+                stopped_reason = "iteration_limit"
 
         except AgentStoppedError as stopped:
             stopped_reason = str(stopped)
         except GroqError as error:
             logger.warning("Agent call failed: %s: %s", type(error).__name__, error)
-            raise LLMUpstreamError() from error
+            upstream_error = LLMUpstreamError()
+            # Attaches whatever steps/tokens were already accrued before the
+            # hard failure - a live full-race run hit this mid-claim (Groq's
+            # daily token cap) and the caught exception's fallback had no way
+            # to show what the run actually did up to that point, purely
+            # because this information was discarded on the way up.
+            upstream_error.steps = steps
+            upstream_error.tokens_used = tokens_used
+            raise upstream_error from error
+
+        cost_usd = round(tokens_used / 1_000_000 * ASSUMED_COST_PER_MILLION_TOKENS, 6)
 
         return {
-            "claim_description": claim_description,
+            "user_input": user_input,
             "answer": answer,
+            "decision": decision,
+            "payout": payout,
             "sources": sources,
             "steps": steps,
             "step_count": len(steps),
             "tokens_used": tokens_used,
+            "cost_usd": cost_usd,
             "latency_ms": int((time.perf_counter() - started) * 1000),
             "stopped_reason": stopped_reason,
             "finished": answer is not None,
             "agent_prompt_version": AGENT_PROMPT_VERSION,
         }
 
-    def _next_action(self, messages: list[dict]) -> tuple[str | None, dict, dict | None, str, int]:
+    def _next_action(self, messages: list[dict], tools: list[dict]) -> tuple[str | None, dict, dict | None, str, int, str | None]:
         """
-        One model call. Returns (tool_name, args, result, raw_text, tokens):
-        `result` is the executed tool's return value (None for `finish`, and
-        meaningless when tool_name is None). Mutates `messages` in place
-        with the assistant turn and, if a tool other than `finish` was
-        called, the matching `role: tool` result message the API requires
-        before the next call.
+        One model call. Returns (tool_name, args, result, raw_text, tokens,
+        call_id): `result` is the executed tool's return value (None for
+        `finish`, and meaningless when tool_name is None). `call_id` is the
+        tool call's id (None when no tool call was made) - run() needs it to
+        append a rejection message if it decides a `finish` call is invalid
+        (see the compute_payout precondition there) without which the API's
+        "every tool_call needs a matching tool-role reply" rule would be
+        violated on the next call. Mutates `messages` in place with the
+        assistant turn and, if a tool other than `finish` was called, the
+        matching `role: tool` result message the API requires before the
+        next call. `tools` is the job-scoped subset run() picked - see
+        AGENT_PROMPT_VERSION's m2 comment for why this isn't TOOL_SCHEMAS.
         """
 
-        response = self._create_completion(messages)
+        response = create_completion_with_retry(
+            self.client, model=settings.MODEL_NAME, messages=messages,
+            tools=tools, temperature=TEMPERATURE, max_tokens=MAX_TOKENS_PER_CALL,
+        )
 
         message = response.choices[0].message
         tokens = response.usage.total_tokens if response.usage else 0
@@ -244,7 +364,7 @@ class ClaimAgent:
 
         if not tool_calls:
             messages.append({"role": "assistant", "content": message.content or ""})
-            return None, {}, None, message.content or "", tokens
+            return None, {}, None, message.content or "", tokens, None
 
         # One action per turn: only the first tool call is executed, even
         # if the model offered several - keeps one step meaning one action,
@@ -273,70 +393,7 @@ class ClaimAgent:
                 "content": json.dumps(result, ensure_ascii=False)[:2000],
             })
 
-        return call.function.name, args, result, message.content or "", tokens
-
-    def _create_completion(self, messages: list[dict]):
-        """
-        One call, with two independent, separately-budgeted retry paths -
-        each real, live-observed, and each needing a different response:
-
-          rate limit    the account is over its tokens-per-minute budget for
-                         this minute; nothing is wrong with the request, so
-                         wait a real amount of time and ask again unchanged.
-          tool-call      the model itself corrupted the call (see
-          corruption     RETRYABLE_TOOL_ERRORS above); waiting does not fix a
-                         generation problem, so nudge the temperature instead.
-
-        Any other error is raised immediately - this is not a general
-        retry-everything loop.
-        """
-
-        last_error: GroqError | None = None
-
-        for rate_attempt in range(RATE_LIMIT_RETRIES + 1):
-
-            for tool_attempt in range(TOOL_PARSE_RETRIES + 1):
-
-                # temperature=0 can reproduce the exact same corrupted tool
-                # call on a bare retry - live-tested and observed happening.
-                # A small bump on retry asks for a genuinely different
-                # generation, without giving up the run's normal
-                # determinism on the first attempt.
-                retry_temperature = TEMPERATURE if tool_attempt == 0 else 0.4
-
-                try:
-                    return self.client.chat.completions.create(
-                        model=settings.MODEL_NAME,
-                        temperature=retry_temperature,
-                        max_tokens=MAX_TOKENS_PER_CALL,
-                        messages=messages,
-                        tools=TOOL_SCHEMAS,
-                        tool_choice="auto",
-                    )
-                except GroqError as error:
-                    last_error = error
-                    text = str(error).lower()
-
-                    if "rate limit" in text or "429" in text:
-                        break  # out of the tool-corruption loop, into the rate-limit wait below
-
-                    retryable = any(marker in text for marker in RETRYABLE_TOOL_ERRORS)
-                    if not retryable or tool_attempt == TOOL_PARSE_RETRIES:
-                        raise
-                    logger.info("Retrying after a malformed tool-call response (attempt %d): %s",
-                                tool_attempt + 1, text[:120])
-            else:
-                continue  # the tool-corruption loop ran out without a rate limit - unreachable, raise above already fired
-
-            # Reached only via the `break` above: a rate limit was hit.
-            if rate_attempt == RATE_LIMIT_RETRIES:
-                raise last_error
-
-            wait = RATE_LIMIT_WAIT_S * (rate_attempt + 1)
-            logger.warning("Rate limited (attempt %d/%d); waiting %ss", rate_attempt + 1, RATE_LIMIT_RETRIES, wait)
-            time.sleep(wait)
-
-        raise last_error  # pragma: no cover - loop always returns or raises above
+        return call.function.name, args, result, message.content or "", tokens, call.id
 
     def _call_tool(self, tool_name: str, args: dict) -> dict:
 
@@ -345,5 +402,17 @@ class ClaimAgent:
 
         if tool_name == "list_documents":
             return list_documents(args)
+
+        if tool_name == "get_claim":
+            return get_claim(args)
+
+        if tool_name == "compute_payout":
+            return compute_payout(args)
+
+        if tool_name == "check_settlement_authority":
+            return check_settlement_authority(args)
+
+        if tool_name == "flag_for_review":
+            return flag_for_review(args)
 
         return {"error": f"Unknown tool {tool_name!r}."}

@@ -9,8 +9,10 @@ from fastapi import Depends
 
 from app.core.errors import IndexEmptyError
 from app.services import shared
+from app.services.agent_service import ClaimAgent
 from app.services.document_service import DocumentService
 from app.services.evaluation_service import EvaluationService
+from app.services.fixed_claim_workflow import FixedClaimWorkflow
 from app.services.rag_service import RAGService
 from app.services.trace_service import TraceService
 
@@ -31,10 +33,20 @@ def evaluation_service() -> EvaluationService:
     return shared.get_evaluation_service()
 
 
+def agent() -> ClaimAgent:
+    return shared.get_agent()
+
+
+def fixed_workflow() -> FixedClaimWorkflow:
+    return shared.get_fixed_workflow()
+
+
 RagDep = Annotated[RAGService, Depends(rag_service)]
 DocumentsDep = Annotated[DocumentService, Depends(document_service)]
 TracesDep = Annotated[TraceService, Depends(trace_service)]
 EvaluationDep = Annotated[EvaluationService, Depends(evaluation_service)]
+AgentDep = Annotated[ClaimAgent, Depends(agent)]
+FixedWorkflowDep = Annotated[FixedClaimWorkflow, Depends(fixed_workflow)]
 
 
 def require_index(rag: RAGService) -> None:

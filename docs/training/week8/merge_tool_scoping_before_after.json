@@ -1,0 +1,78 @@
+{
+  "week_8_requirement_this_supports": "Requirement 4: apply exactly ONE mitigation to a named failure mode from the Week-8 zoo, and report that mode's count before -> after plus the measured price (added latency, tokens, or cost per claim).",
+  "honest_scope_note": "This is a single-claim demonstration (CLM-2001), found and fixed live while re-verifying the merged agent BEFORE running the formal 10-claim trajectory-eval race. It is not yet the full-10-claim before/after count the rubric asks for - that still requires running scripts/race.py --suite triage over all 10 claims and scoring with trajectory_eval.py. This file shows the mitigation is real and already measured on the one case that exposed it; the full-sample count is a follow-up step, not fabricated here.",
+
+  "failure_mode": {
+    "name": "unresolved",
+    "definition": "classify_failure_mode() in app/services/trajectory_eval.py tags any trace whose stopped_reason != 'finished' as unresolved - the agent hit a budget or a hard error before ever reaching a decision, regardless of whether its internal reasoning was actually correct.",
+    "why_this_one": "Live-observed on CLM-2001: the agent correctly computed the right payout via compute_payout, then hit token_limit before it could call finish - a real, reportable trajectory failure even though the underlying reasoning was sound."
+  },
+
+  "mitigation": {
+    "one_line": "ClaimAgent.run() now picks a job-specific system prompt and tool subset (via the same CLM-\\d+ regex FixedClaimWorkflow already used), instead of sending both jobs' full prompt and all 11 tool schemas on every call.",
+    "category": "tighter tool description / reduced tool surface (one of the five listed mitigation types: tighter tool description, argument validation, hard step limit, re-planning, replace with workflow)",
+    "files_changed": ["app/services/agent_tools.py", "app/services/agent_service.py", "app/services/fixed_claim_workflow.py"],
+    "not_a_hard_step_limit": "DEFAULT_MAX_ITERATIONS/MAX_TOKENS were not changed - this mitigation reduces per-call overhead, it does not raise or lower any budget."
+  },
+
+  "before_after_count": {
+    "sample": "CLM-2001 only (n=1) - see honest_scope_note",
+    "unresolved_count_before": 1,
+    "unresolved_count_after": 0,
+    "note": "1/1 -> 0/1 on this claim. The rubric wants this same count across all 10 claims; pending the full race run."
+  },
+
+  "price_paid": {
+    "metric": "tokens_used and latency_ms, same claim, same model, same budgets - the two numbers the rubric explicitly allows as \"the price\"",
+    "tokens_used": { "before": 17204, "after": 17577, "delta": 373, "delta_pct": "+2.2%" },
+    "latency_ms": { "before": 79692, "after": 111328, "delta": 31636, "delta_pct": "+39.7%" },
+    "honest_reading": "The price is not negative (the fix did not make anything cheaper) - it's roughly break-even on tokens and worse on latency for this one run, because the fixed prompt/tool overhead was never the dominant cost for a triage input (only list_documents was excludable; triage already needs 10 of 11 tools). The mitigation is still worth its price: it's the difference between a run that reports a decision and one that silently runs out of budget with the right answer already computed and never told to anyone."
+  },
+
+  "raw_traces": {
+    "before_fix": {
+      "input": "CLM-2001",
+      "finished": false,
+      "stopped_reason": "token_limit",
+      "step_count": 5,
+      "tokens_used": 17204,
+      "latency_ms": 79692,
+      "decision": null,
+      "payout": null,
+      "steps": [
+        { "step": 1, "tool": "get_claim", "args": { "claim_id": "CLM-2001" } },
+        { "step": 2, "tool": "search_policy", "args": { "query": "water backup basement floor drain HO-2026-01 coverage", "source": "HO-2026-01", "top_k": 5 } },
+        { "step": 3, "tool": "search_policy", "args": { "query": "limit water backup endorsement HO-2026-01 limit", "source": "endorsement-HO-2026-01-water-backup.md", "top_k": 5 } },
+        { "step": 4, "tool": "search_policy", "args": { "query": "deductible water backup endorsement HO-2026-01", "source": "endorsement-HO-2026-01-water-backup.md", "top_k": 5 } },
+        { "step": 5, "tool": "compute_payout", "args": { "claim_status": "approved", "claimed_amount": 6000, "excess_amount": 500 }, "result": { "claim_status": "approved", "payout": 5500.0 } }
+      ]
+    },
+    "after_fix": {
+      "input": "CLM-2001",
+      "finished": true,
+      "stopped_reason": "finished",
+      "step_count": 6,
+      "tokens_used": 17577,
+      "latency_ms": 111328,
+      "decision": "approved",
+      "payout": 5500,
+      "answer": "The claim is approved. The loss is covered under the water backup endorsement, and the applicable deductible is $500, so the payout is $5,500.",
+      "sources": ["endorsement-HO-2026-01-water-backup.md"],
+      "steps": [
+        { "step": 1, "tool": "get_claim", "args": { "claim_id": "CLM-2001" } },
+        { "step": 2, "tool": "search_policy", "args": { "query": "water backup endorsement HO-2026-01 basement floor drain backed up", "top_k": 5 } },
+        { "step": 3, "tool": "search_policy", "args": { "query": "deductible HO-2026-01 water backup", "top_k": 5 } },
+        { "step": 4, "tool": "check_settlement_authority", "args": { "payout_amount": 5500 }, "result": { "required_grade": "desk_adjuster_grade_1", "authority_limit": 10000 } },
+        { "step": 5, "tool": "compute_payout", "args": { "claim_status": "approved", "claimed_amount": 6000, "excess_amount": 500 }, "result": { "claim_status": "approved", "payout": 5500.0 } },
+        { "step": 6, "tool": "finish", "args": { "answer": "The claim is approved. The loss is covered under the water backup endorsement, and the applicable deductible is $500, so the payout is $5,500.", "decision": "approved", "payout": 5500, "sources": ["endorsement-HO-2026-01-water-backup.md"] } }
+      ]
+    }
+  },
+
+  "still_pending_for_the_full_week_8_submission": [
+    "Run scripts/race.py --suite triage over all 10 claims to get real trajectory data.",
+    "Score that data with app/services/trajectory_eval.py to get the four trajectory numbers, the outcome-vs-trajectory gap, and the REAL per-mode failure counts across all 10 claims.",
+    "Confirm 'unresolved' is actually the top failure mode in that real data before treating this mitigation as the official Week 8 submission mitigation - if a different mode (e.g. hallucinated_argument, skipped_exclusion_check) turns out to dominate, that one needs its own targeted fix instead, per the task's own rule against guessing the mitigation before measuring.",
+    "Run the regression check across every mode in the taxonomy, before and after, on the full 10-claim set."
+  ]
+}

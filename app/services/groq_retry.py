@@ -1,10 +1,9 @@
 """
-The Groq retry dance, factored out once it was about to be copy-pasted a
-third and fourth time (agent_service.py and fixed_claim_workflow.py each
-carry their own already-shipped, already-tested copy from the original
-Week 7 build - left untouched here rather than risking a working, verified
-rate-limit fix for a mid-task cleanup). triage_agent.py and
-fixed_triage_workflow.py share this one instead.
+The Groq retry dance, shared by both agent_service.py's ClaimAgent and
+fixed_claim_workflow.py's FixedClaimWorkflow - originally written once for
+the (since-merged) triage-only agent/workflow pair, then adopted by the
+original policy-QA pair too when the two agents were merged into one class,
+replacing an older, separately-maintained copy of the same logic.
 
 Two independently-budgeted retry paths, both live-observed on this model
 (openai/gpt-oss-20b) during Week 7, not hypothetical:

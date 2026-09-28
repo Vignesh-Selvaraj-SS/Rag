@@ -16,6 +16,7 @@ const NAV: NavItem[] = [
   { path: '/documents', label: 'Documents', icon: '📄' },
   { path: '/evaluation', label: 'Evaluation', icon: '🎯' },
   { path: '/analytics', label: 'Analytics', icon: '📈' },
+  { path: '/agent', label: 'Agent', icon: '🧭' },
   { path: '/settings', label: 'Settings', icon: '⚙️' },
   { path: '/developer', label: 'Developer', icon: '🛠️', developer: true },
 ];

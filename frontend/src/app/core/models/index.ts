@@ -1,3 +1,4 @@
+export * from './agent.model';
 export * from './api-error.model';
 export * from './chat.model';
 export * from './documents.model';

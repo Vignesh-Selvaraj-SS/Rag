@@ -33,5 +33,5 @@ def all_claim_ids() -> list[str]:
 def get_claim_record(claim_id: str) -> dict[str, Any] | None:
     """The full fixture record, including the expected answer - callers that
     hand this to the model must strip `expected`/`why`/`dependent` first
-    (see get_claim() in triage_tools.py)."""
+    (see get_claim() in agent_tools.py)."""
     return _load().get(claim_id)

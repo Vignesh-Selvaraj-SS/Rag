@@ -28,6 +28,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/analytics/analytics-page').then((m) => m.AnalyticsPage),
       },
       {
+        path: 'agent',
+        title: 'Agent · RAG Assistant',
+        loadComponent: () => import('./features/agent/agent-page').then((m) => m.AgentPage),
+      },
+      {
         path: 'settings',
         title: 'Settings · RAG Assistant',
         loadComponent: () => import('./features/settings/settings-page').then((m) => m.SettingsPage),

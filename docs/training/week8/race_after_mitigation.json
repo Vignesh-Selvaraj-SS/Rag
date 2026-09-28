@@ -1,0 +1,2330 @@
+[
+  {
+    "claim_id": "CLM-2001",
+    "dependent": false,
+    "expected": {
+      "decision": "approved",
+      "deductible": 500,
+      "payout": 5500,
+      "dependent": false
+    },
+    "agent": {
+      "decision": "approved",
+      "payout": 5500,
+      "sources": [
+        "endorsement-HO-2026-01-water-backup.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2001"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2001",
+              "claimed_amount": 6000,
+              "policy_form": "HO-3-2026 + HO-2026-01 (water backup)",
+              "adjuster_notes": "Heavy rain overnight. Basement floor drain backed up and flooded the basement with wastewater. The basement is unfinished, used only for storage and utilities - never finished as living space. Sump pump was inspected the same day and found in proper working order, no mechanical failure. No creek, river or other body of water near the property overflowed."
+            }
+          },
+          "latency_ms": 846,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "water backup coverage HO-2026-01",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Endorsement HO-2026-01 — Water Backup and Sump Discharge or Overflow",
+                "page": "p.1",
+                "score": 0.816,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $68 annual, or $112 annual at the $25,000 limit option\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Coverage provided",
+                "page": "p.1",
+                "score": 0.761,
+                "text": "Meridian Mutual will pay for direct physical loss to covered property caused by water, or\nwaterborne material, which:\n\n1. **backs up through sewers or drains**; or\n2. **overflows or is discharged from a sump, sump pump or related equipment**, even where\n   the overflow results from mechanical breakdown of the sump pump.\n\nCoverage applies to Coverage A, Coverage B and Coverage C property, and to Coverage D\nloss of use arising from a covered water backup event."
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Claim handling note",
+                "page": "p.1",
+                "score": 0.757,
+                "text": "Water backup claims are assigned to the **Property — Water team** and carry a target\nfirst-contact time of **one business day** from First Notice of Loss. A moisture-mapping\ninspection is required before any payment above **$5,000**."
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.743,
+                "text": "A **separate deductible of $500** applies to each water backup occurrence. This deductible\napplies **instead of**, not in addition to, the base all-perils deductible of $1,000."
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Conditions",
+                "page": "p.1",
+                "score": 0.74,
+                "text": "Coverage under this endorsement applies **only if**:\n\n- the sump pump and any related equipment were in **proper working order** at the time of\n  loss; and\n- for dwellings with a finished basement, a **battery backup sump system or water alarm**\n  is installed, where the dwelling was built or the basement finished after 01 January 2020.\n\nWhere the required backup system is absent, the limit is reduced to **$2,500** rather than\nbeing voided entirely."
+              }
+            ]
+          },
+          "latency_ms": 862,
+          "tokens": 1507
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "compute_payout",
+          "args": {
+            "claim_status": "approved",
+            "claimed_amount": 6000,
+            "excess_amount": 500
+          },
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 5500.0
+            }
+          },
+          "latency_ms": 1089,
+          "tokens": 2489
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "check_settlement_authority",
+          "args": {
+            "payout_amount": 5500
+          },
+          "result": {
+            "result": {
+              "required_grade": "desk_adjuster_grade_1",
+              "authority_limit": 10000
+            }
+          },
+          "latency_ms": 1050,
+          "tokens": 2462
+        },
+        {
+          "step": 5,
+          "thought": "",
+          "tool": "finish",
+          "args": {
+            "answer": "The loss is covered under the HO‑2026‑01 Water Backup endorsement because the basement drain backed up and the sump pump was in proper working order at the time of loss, and the basement is unfinished so no additional finished‑basement condition applies. The endorsement provides a separate $500 deductible, which applies instead of the base deductible. Therefore the claim is approved and the payout is $5,500. The payout is within the desk adjuster grade 1 authority limit of $10,000.",
+            "decision": "approved",
+            "payout": 5500,
+            "sources": [
+              "endorsement-HO-2026-01-water-backup.md"
+            ]
+          },
+          "result": null,
+          "latency_ms": 32968,
+          "tokens": 2568
+        }
+      ],
+      "step_count": 5,
+      "tokens_used": 10343,
+      "cost_usd": 0.002069,
+      "latency_ms": 36817,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    },
+    "workflow": {
+      "decision": "approved",
+      "payout": 5500.0,
+      "sources": [
+        "endorsement-HO-2026-01-water-backup.md",
+        "faq-policyholder-endorsements.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2001",
+              "claimed_amount": 6000,
+              "policy_form": "HO-3-2026 + HO-2026-01 (water backup)",
+              "adjuster_notes": "Heavy rain overnight. Basement floor drain backed up and flooded the basement with wastewater. The basement is unfinished, used only for storage and utilities - never finished as living space. Sump pump was inspected the same day and found in proper working order, no mechanical failure. No creek, river or other body of water near the property overflowed."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 27
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"approved\",\"excess_amount\":500,\"reasoning\":\"Coverage applies under endorsement HO-2026-01 (Conditions and Coverage provided) because the sump pump was in proper working order and the endorsement deletes exclusion 3 of the base form; the policy states a $500 deductible for water backup claims.\",\"sources\":[\"endorsement-HO-2026-01-water-backup.md\",\"faq-policyholder-endorsements.md\"]}",
+          "latency_ms": 14635,
+          "tokens": 2188
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 5500.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 2188,
+      "cost_usd": 0.000438,
+      "latency_ms": 14662,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2002",
+    "dependent": true,
+    "expected": {
+      "decision": "denied",
+      "deductible": null,
+      "payout": 0,
+      "dependent": true
+    },
+    "agent": {
+      "decision": null,
+      "payout": null,
+      "sources": [],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2002"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2002",
+              "claimed_amount": 9000,
+              "policy_form": "HO-3-2026 + HO-2026-01 (water backup)",
+              "adjuster_notes": "Regional flooding after three days of storms. The creek behind the property overflowed its banks and backed up through the basement floor drain and sewer connection. Policyholder holds the water backup endorsement (HO-2026-01) and is asking why that doesn't apply here."
+            }
+          },
+          "latency_ms": 3867,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-2026-01 water backup endorsement coverage",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Endorsement HO-2026-01 — Water Backup and Sump Discharge or Overflow",
+                "page": "p.1",
+                "score": 0.881,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $68 annual, or $112 annual at the $25,000 limit option\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Exclusions specific to this endorsement",
+                "page": "p.1",
+                "score": 0.809,
+                "text": "This endorsement does not cover:\n\n- loss caused by the insured's **failure to maintain** the sump pump, drain or sewer\n  connection, where that failure is the sole cause of loss;\n- **continuous or repeated seepage** over a period of more than 14 days, whether or not\n  the insured was aware of it;\n- loss resulting from **flood**, as defined in the base form, even where flood water\n  subsequently enters through a drain or sump;\n- **mould, fungus or wet rot** resulting from a water backup event, beyond the sub-limit\n  in endorsement HO-2026-01A, if attached."
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Conditions",
+                "page": "p.1",
+                "score": 0.769,
+                "text": "Coverage under this endorsement applies **only if**:\n\n- the sump pump and any related equipment were in **proper working order** at the time of\n  loss; and\n- for dwellings with a finished basement, a **battery backup sump system or water alarm**\n  is installed, where the dwelling was built or the basement finished after 01 January 2020.\n\nWhere the required backup system is absent, the limit is reduced to **$2,500** rather than\nbeing voided entirely."
+              },
+              {
+                "source": "claims-adjuster-authority.md",
+                "heading": "3. Deductible application",
+                "page": "p.1",
+                "score": 0.761,
+                "text": "The deductible is applied **once per occurrence**, not once per coverage. Where an\nendorsement carries its own deductible, that deductible replaces the base deductible for\nthe portion of the loss falling under the endorsement:\n\n- Water backup (HO-2026-01): **$500**, replacing the base $1,000\n- Service line (HO-2026-02): **$500**, replacing the base $1,000\n- Equipment breakdown (HO-2026-03): **$500**, replacing the base $1,000\n- Scheduled property (HO-2026-04): **no deductible**\n- Identity fraud (HO-2026-07): **$250**\n\nWhere a single occurrence triggers both a base-form loss and an endorsement loss, apply the\n**base deductible once to the base-form portion** and the endorsement deductible once to\nthe endorsement portion. Do not apply the base deductible to the endorsement portion as\nwell."
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Claim handling note",
+                "page": "p.1",
+                "score": 0.77,
+                "text": "Water backup claims are assigned to the **Property — Water team** and carry a target\nfirst-contact time of **one business day** from First Notice of Loss. A moisture-mapping\ninspection is required before any payment above **$5,000**."
+              }
+            ]
+          },
+          "latency_ms": 8408,
+          "tokens": 1632
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-3-2026 flood exclusion",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.753,
+                "text": "Exclusion 3 of the base form excludes water which backs up through sewers or drains. This\nendorsement **deletes that portion of the exclusion** and adds the coverage described\nbelow. All other terms of exclusion 3 — including flood, surface water and overflow of a\nbody of water — remain fully excluded and are **not** restored by this endorsement."
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Exclusions specific to this endorsement",
+                "page": "p.1",
+                "score": 0.74,
+                "text": "This endorsement does not cover:\n\n- loss caused by the insured's **failure to maintain** the sump pump, drain or sewer\n  connection, where that failure is the sole cause of loss;\n- **continuous or repeated seepage** over a period of more than 14 days, whether or not\n  the insured was aware of it;\n- loss resulting from **flood**, as defined in the base form, even where flood water\n  subsequently enters through a drain or sump;\n- **mould, fungus or wet rot** resulting from a water backup event, beyond the sub-limit\n  in endorsement HO-2026-01A, if attached."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.696,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "faq-policyholder-endorsements.md",
+                "heading": "My basement flooded after heavy rain. Am I covered?",
+                "page": "p.1",
+                "score": 0.68,
+                "text": "It depends on how the water got in. If water **backed up through a drain or sewer**, or a\n**sump pump overflowed**, and you have endorsement HO-2026-01, you are covered up to\n$10,000 (or $25,000 if you chose the higher limit) with a $500 deductible. If **surface\nwater flowed in** from outside — over the ground, through a window well, or from a river or\nstorm surge — that is **flood**, and flood is not covered by any endorsement in this pack.\nFlood cover must be bought separately."
+              },
+              {
+                "source": "endorsement-HO-2026-05-ordinance-or-law.md",
+                "heading": "Endorsement HO-2026-05 — Increased Ordinance or Law Coverage",
+                "page": "p.1",
+                "score": 0.704,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $31 annual at the 25% option, $74 annual at the 50% option\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              }
+            ]
+          },
+          "latency_ms": 19401,
+          "tokens": 2267
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "compute_payout",
+          "args": {
+            "claim_status": "denied",
+            "claimed_amount": 9000,
+            "excess_amount": 0
+          },
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 19259,
+          "tokens": 2851
+        },
+        {
+          "step": 5,
+          "thought": "{\"answer\":\"The claim is denied because the loss is caused by flood water that entered through a drain, and the water‑backup endorsement specifically excludes flood‑related losses even when water backs up through a drain or sump. The payout is $0.\",\"decision\":\"denied\",\"payout\":0.0,\"sources\":[\"endorsement-HO-2026-01-water-backup.md\"]}",
+          "tool": "finish (implicit - no tool call made)",
+          "args": {},
+          "result": null,
+          "latency_ms": 41713,
+          "tokens": 2919
+        }
+      ],
+      "step_count": 5,
+      "tokens_used": 10986,
+      "cost_usd": 0.002197,
+      "latency_ms": 92650,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": false
+    },
+    "workflow": {
+      "decision": "denied",
+      "payout": 0.0,
+      "sources": [
+        "faq-policyholder-endorsements.md",
+        "endorsement-HO-2026-01-water-backup.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2002",
+              "claimed_amount": 9000,
+              "policy_form": "HO-3-2026 + HO-2026-01 (water backup)",
+              "adjuster_notes": "Regional flooding after three days of storms. The creek behind the property overflowed its banks and backed up through the basement floor drain and sewer connection. Policyholder holds the water backup endorsement (HO-2026-01) and is asking why that doesn't apply here."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 23
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"denied\",\"excess_amount\":0,\"reasoning\":\"The endorsement HO‑2026‑01 only applies if the sump pump and related equipment were in proper working order at the time of loss and, for finished basements, a battery backup sump system or water alarm is installed (see endorsement‑HO‑2026‑01‑water‑backup – Conditions). The case file provides no evidence that these conditions were met, so the endorsement does not apply and the claim is denied.\",\"sources\":[\"faq-policyholder-endorsements.md\",\"endorsement-HO-2026-01-water-backup.md\"]}",
+          "latency_ms": 16014,
+          "tokens": 2765
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 2765,
+      "cost_usd": 0.000553,
+      "latency_ms": 16038,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2003",
+    "dependent": true,
+    "expected": {
+      "decision": "denied",
+      "deductible": null,
+      "payout": 0,
+      "dependent": true
+    },
+    "agent": {
+      "decision": "denied",
+      "payout": 0,
+      "sources": [
+        "endorsement-HO-2026-03-equipment-breakdown.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2003"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2003",
+              "claimed_amount": 4200,
+              "policy_form": "HO-3-2026 + HO-2026-03 (equipment breakdown)",
+              "adjuster_notes": "HVAC compressor failed suddenly and stopped cooling. Unit is 2 years old. Policyholder confirms the manufacturer's warranty is a 5-year parts-and-labor warranty and the manufacturer has already agreed to send a technician under that warranty at no cost."
+            }
+          },
+          "latency_ms": 748,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "equipment breakdown endorsement HO-2026-03 HVAC compressor warranty",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.801,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-09-equipment-warranty.pdf",
+                "heading": "SECTION 1 - What this endorsement does",
+                "page": "p.1",
+                "score": 0.782,
+                "text": "Extends manufacturer warranty coverage for sump pumps, well pumps and other mechanical\nequipment beyond the manufacturer's original warranty period, for equipment already covered\nunder endorsement HO-2026-03. This endorsement applies only where HO-2026-03 is also attached\nto the policy."
+              },
+              {
+                "source": "faq-policyholder-endorsements.md",
+                "heading": "My air conditioner died. Is that a claim?",
+                "page": "p.1",
+                "score": 0.772,
+                "text": "Only if it **broke down suddenly**. Endorsement HO-2026-03 covers sudden mechanical or\nelectrical breakdown up to $100,000 with a $500 deductible. It does not cover an old unit\nthat simply wore out, and it does not cover anything a manufacturer's warranty still\ncovers. If the unit is 10 years or older we settle at actual cash value, not replacement\ncost."
+              },
+              {
+                "source": "endorsement-HO-2026-09-equipment-warranty.pdf",
+                "heading": "Endorsement HO-2026-09 - Sump Pump and Mechanical Equipment Warranty Extension",
+                "page": "p.1",
+                "score": 0.789,
+                "text": "Attaches to: HO-3-2026 base form\nEffective: 01 March 2026\nPremium: $38 annual"
+              },
+              {
+                "source": "endorsement-HO-2026-09-equipment-warranty.pdf",
+                "heading": "SECTION 6 - Claim handling note",
+                "page": "pp.1-2",
+                "score": 0.763,
+                "text": "Warranty claims under this endorsement require the original installation invoice or proof of\nprofessional installation date. Claims without this documentation are referred to the Equipment\n\n| Equipment type | Extended warranty period | Limit per failure |\n| Sump pump | 5 years | $1,500 |\n| Well pump | 5 years | $3,000 |\n| Sewage ejector pump | 3 years | $1,200 |\nBreakdown specialist unit for manual review."
+              }
+            ]
+          },
+          "latency_ms": 1035,
+          "tokens": 1691
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "compute_payout",
+          "args": {
+            "claim_status": "denied",
+            "claimed_amount": 4200,
+            "excess_amount": 0
+          },
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 602,
+          "tokens": 2158
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-2026-03 equipment breakdown warranty exclusion",
+            "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.795,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.79,
+                "text": "Exclusion 10 of the base form excludes mechanical breakdown, latent defect and damage\nfrom artificially generated electrical current. This endorsement **adds back** coverage for\nsudden and accidental **breakdown of covered equipment** at the residence premises."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Equipment not covered",
+                "page": "p.1",
+                "score": 0.788,
+                "text": "- any vehicle, watercraft or aircraft, including the **electric vehicle itself** — only the\n  home charging station is covered\n- equipment used primarily in a **business**, unless endorsement HO-2026-06 is attached\n- equipment still covered by a **manufacturer's warranty or a service contract**, to the\n  extent that warranty responds\n- water piping, sanitary piping and sprinkler systems\n- equipment more than **25 years old** where replacement parts are no longer manufactured"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Claim handling note",
+                "page": "p.1",
+                "score": 0.76,
+                "text": "Equipment breakdown claims require the **failed component to be retained** for inspection\nuntil the claim is closed. Disposal of the failed unit before inspection may result in\nsettlement on an actual cash value basis regardless of age. Claims above **$25,000** are\nreferred to the Equipment Breakdown specialist unit and require a forensic engineer report."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Limit of liability",
+                "page": "p.1",
+                "score": 0.784,
+                "text": "The limit is **$100,000 per breakdown occurrence**. The following additional coverages\napply **within** that limit:\n\n| Additional coverage | Sub-limit |\n| --- | --- |\n| Spoilage of refrigerated food and medication | $1,000 |\n| Expediting expenses to speed up repair | $5,000 |\n| Environmentally friendly (\"green\") replacement upgrade | $5,000 |\n| Increased cost to comply with current code | $10,000 |\n| Loss of use during equipment repair | $2,500 |"
+              }
+            ]
+          },
+          "latency_ms": 36698,
+          "tokens": 2222
+        },
+        {
+          "step": 5,
+          "thought": "",
+          "tool": "finish",
+          "args": {
+            "answer": "The HVAC compressor failure is excluded because it is still covered by the manufacturer’s 5‑year warranty, and the equipment breakdown endorsement specifically excludes loss covered by a manufacturer’s warranty. Therefore the claim is denied and the payout is $0.0.",
+            "decision": "denied",
+            "payout": 0,
+            "sources": [
+              "endorsement-HO-2026-03-equipment-breakdown.md"
+            ]
+          },
+          "result": null,
+          "latency_ms": 43814,
+          "tokens": 3023
+        }
+      ],
+      "step_count": 5,
+      "tokens_used": 10411,
+      "cost_usd": 0.002082,
+      "latency_ms": 82901,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    },
+    "workflow": {
+      "decision": "denied",
+      "payout": 0.0,
+      "sources": [
+        "faq-policyholder-endorsements.md",
+        "endorsement-HO-2026-03-equipment-breakdown.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2003",
+              "claimed_amount": 4200,
+              "policy_form": "HO-3-2026 + HO-2026-03 (equipment breakdown)",
+              "adjuster_notes": "HVAC compressor failed suddenly and stopped cooling. Unit is 2 years old. Policyholder confirms the manufacturer's warranty is a 5-year parts-and-labor warranty and the manufacturer has already agreed to send a technician under that warranty at no cost."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 23
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"denied\",\"excess_amount\":0,\"reasoning\":\"The HVAC compressor is still under the manufacturer’s 5‑year warranty, and endorsement HO‑2026‑03 explicitly excludes coverage for equipment still covered by a manufacturer’s warranty (see FAQ section “My air conditioner died. Is that a claim?” and Equipment not covered section of HO‑2026‑03).\",\"sources\":[\"faq-policyholder-endorsements.md\",\"endorsement-HO-2026-03-equipment-breakdown.md\"]}",
+          "latency_ms": 9712,
+          "tokens": 1566
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 1566,
+      "cost_usd": 0.000313,
+      "latency_ms": 9736,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2004",
+    "dependent": false,
+    "expected": {
+      "decision": "approved",
+      "deductible": 500,
+      "payout": 1600,
+      "dependent": false
+    },
+    "agent": {
+      "decision": null,
+      "payout": null,
+      "sources": [],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2004"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2004",
+              "claimed_amount": 2100,
+              "policy_form": "HO-3-2026 + HO-2026-03 (equipment breakdown)",
+              "adjuster_notes": "Refrigerator (12 years old) stopped running after a power surge from a lightning strike on the neighborhood transformer, off the residence premises. No manufacturer warranty in force. Failed compressor retained for inspection."
+            }
+          },
+          "latency_ms": 6119,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "equipment breakdown endorsement HO-2026-03 coverage power surge lightning strike",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.793,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.803,
+                "text": "Exclusion 10 of the base form excludes mechanical breakdown, latent defect and damage\nfrom artificially generated electrical current. This endorsement **adds back** coverage for\nsudden and accidental **breakdown of covered equipment** at the residence premises."
+              },
+              {
+                "source": "faq-policyholder-endorsements.md",
+                "heading": "My air conditioner died. Is that a claim?",
+                "page": "p.1",
+                "score": 0.736,
+                "text": "Only if it **broke down suddenly**. Endorsement HO-2026-03 covers sudden mechanical or\nelectrical breakdown up to $100,000 with a $500 deductible. It does not cover an old unit\nthat simply wore out, and it does not cover anything a manufacturer's warranty still\ncovers. If the unit is 10 years or older we settle at actual cash value, not replacement\ncost."
+              },
+              {
+                "source": "endorsement-HO-2026-09-equipment-warranty.pdf",
+                "heading": "SECTION 1 - What this endorsement does",
+                "page": "p.1",
+                "score": 0.704,
+                "text": "Extends manufacturer warranty coverage for sump pumps, well pumps and other mechanical\nequipment beyond the manufacturer's original warranty period, for equipment already covered\nunder endorsement HO-2026-03. This endorsement applies only where HO-2026-03 is also attached\nto the policy."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Definition of breakdown",
+                "page": "p.1",
+                "score": 0.676,
+                "text": "**Breakdown** means the sudden and accidental physical damage to covered equipment that\nrequires its repair or replacement, arising from:\n\n- mechanical breakdown, including rupture or bursting caused by centrifugal force\n- artificially generated electrical current, including electrical arcing\n- explosion of steam boilers, steam pipes or steam engines\n- loss or damage to hot water heating systems from freezing\n- **power surge originating off the residence premises**, including surge from a utility\n  fault or a lightning strike to the grid\n\nBreakdown does **not** mean wear and tear on its own, gradual deterioration, rust,\ncorrosion, or a defect that has caused no sudden physical damage."
+              }
+            ]
+          },
+          "latency_ms": 11326,
+          "tokens": 1578
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-2026-03 deductible",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.795,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "claims-adjuster-authority.md",
+                "heading": "3. Deductible application",
+                "page": "p.1",
+                "score": 0.722,
+                "text": "The deductible is applied **once per occurrence**, not once per coverage. Where an\nendorsement carries its own deductible, that deductible replaces the base deductible for\nthe portion of the loss falling under the endorsement:\n\n- Water backup (HO-2026-01): **$500**, replacing the base $1,000\n- Service line (HO-2026-02): **$500**, replacing the base $1,000\n- Equipment breakdown (HO-2026-03): **$500**, replacing the base $1,000\n- Scheduled property (HO-2026-04): **no deductible**\n- Identity fraud (HO-2026-07): **$250**\n\nWhere a single occurrence triggers both a base-form loss and an endorsement loss, apply the\n**base deductible once to the base-form portion** and the endorsement deductible once to\nthe endorsement portion. Do not apply the base deductible to the endorsement portion as\nwell."
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.762,
+                "text": "A **$500 deductible** applies per service line occurrence, in place of the base all-perils\ndeductible."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.748,
+                "text": "A **$500 deductible** applies per breakdown occurrence, in place of the base all-perils\ndeductible."
+              },
+              {
+                "source": "endorsement-HO-2026-09-equipment-warranty.pdf",
+                "heading": "SECTION 4 - Deductible",
+                "page": "p.1",
+                "score": 0.736,
+                "text": "A $100 deductible applies per warranty claim under this endorsement, separate from and in\naddition to any deductible applying to the underlying water damage claim, if any."
+              }
+            ]
+          },
+          "latency_ms": 14363,
+          "tokens": 2513
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "finish (implicit - no tool call made)",
+          "args": {},
+          "result": null,
+          "latency_ms": 23689,
+          "tokens": 3279
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 8687,
+      "cost_usd": 0.001737,
+      "latency_ms": 55499,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": false
+    },
+    "workflow": {
+      "decision": "approved",
+      "payout": 1600.0,
+      "sources": [
+        "endorsement-HO-2026-03-equipment-breakdown.md",
+        "faq-policyholder-endorsements.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2004",
+              "claimed_amount": 2100,
+              "policy_form": "HO-3-2026 + HO-2026-03 (equipment breakdown)",
+              "adjuster_notes": "Refrigerator (12 years old) stopped running after a power surge from a lightning strike on the neighborhood transformer, off the residence premises. No manufacturer warranty in force. Failed compressor retained for inspection."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 20
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"approved\",\"excess_amount\":500,\"reasoning\":\"The claim is covered because the refrigerator’s failure is a sudden electrical breakdown caused by a power surge off the residence premises, which is explicitly included in the definition of breakdown in endorsement‑HO‑2026‑03 (section: Definition of breakdown). The endorsement also states that sudden mechanical or electrical breakdowns are covered up to $100,000 with a $500 deductible, and that units 10 years or older are settled at actual cash value rather than replacement cost (faq-policyholder-endorsements.md, section: My air conditioner died. Is that a claim?).\",\"sources\":[\"endorsement-HO-2026-03-equipment-breakdown.md\",\"faq-policyholder-endorsements.md\"]}",
+          "latency_ms": 20484,
+          "tokens": 2404
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 1600.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 2404,
+      "cost_usd": 0.000481,
+      "latency_ms": 20505,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2005",
+    "dependent": true,
+    "expected": {
+      "decision": "denied",
+      "deductible": null,
+      "payout": 0,
+      "dependent": true
+    },
+    "agent": {
+      "decision": null,
+      "payout": null,
+      "sources": [],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2005"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2005",
+              "claimed_amount": 3000,
+              "policy_form": "HO-3-2026 (base form only, no equipment endorsement)",
+              "adjuster_notes": "Furnace output has been declining for months. Technician found long-term internal corrosion and rust on the heat exchanger, with no single sudden event reported by the homeowner."
+            }
+          },
+          "latency_ms": 729,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "heat exchanger corrosion furnace mechanical breakdown exclusion",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.673,
+                "text": "Exclusion 10 of the base form excludes mechanical breakdown, latent defect and damage\nfrom artificially generated electrical current. This endorsement **adds back** coverage for\nsudden and accidental **breakdown of covered equipment** at the residence premises."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Definition of breakdown",
+                "page": "p.1",
+                "score": 0.661,
+                "text": "**Breakdown** means the sudden and accidental physical damage to covered equipment that\nrequires its repair or replacement, arising from:\n\n- mechanical breakdown, including rupture or bursting caused by centrifugal force\n- artificially generated electrical current, including electrical arcing\n- explosion of steam boilers, steam pipes or steam engines\n- loss or damage to hot water heating systems from freezing\n- **power surge originating off the residence premises**, including surge from a utility\n  fault or a lightning strike to the grid\n\nBreakdown does **not** mean wear and tear on its own, gradual deterioration, rust,\ncorrosion, or a defect that has caused no sudden physical damage."
+              },
+              {
+                "source": "policy-base-HO3-2026.md",
+                "heading": "Section I — Exclusions",
+                "page": "p.1",
+                "score": 0.616,
+                "text": "The following are excluded under the base form. Some may be added back by endorsement.\n\n1. **Ordinance or law** — increased costs from enforcement of any building code.\n   *May be added back by endorsement HO-2026-05.*\n2. **Earth movement** — earthquake, landslide, sinkhole, mudflow, subsidence.\n3. **Water damage** — flood, surface water, waves, tidal water, overflow of a body of\n   water, and **water which backs up through sewers or drains**.\n   *Sewer and drain backup may be added back by endorsement HO-2026-01.*\n4. **Power failure** occurring off the residence premises.\n5. **Neglect** of an insured to use reasonable means to save and preserve property.\n6. **War**, including undeclared war and civil war.\n7. **Nuclear hazard.**\n8. **Intentional loss** by or at the direction of an insured.\n9. **Governmental action** — seizure or destruction by order of a public authority.\n10. **Wear and tear**, marring, deterioration, mechanical breakdown, latent defect,\n    rust, mould, wet or dry rot, and smog.\n    *Mechanical and electrical breakdown may be added back by endorsement HO-2026-03.*\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Covered equipment",
+                "page": "p.1",
+                "score": 0.608,
+                "text": "Permanently installed or portable equipment at the residence premises, including:\n\n- heating, ventilation and air conditioning systems, including heat pumps\n- water heaters, well pumps and water treatment systems\n- electrical service panels, wiring and standby generators\n- **solar photovoltaic panels, inverters and battery storage systems**\n- **electric vehicle supply equipment (home charging stations)**\n- home appliances: refrigerators, freezers, ovens, dishwashers, washers, dryers\n- home electronics: televisions, computers, home theatre and smart home controllers\n- swimming pool and spa equipment, including pumps and heaters"
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Covered causes of loss",
+                "page": "p.1",
+                "score": 0.583,
+                "text": "Coverage applies to damage caused by:\n\n- wear and tear, marring, deterioration or latent defect\n- rust, corrosion, decay or rot\n- mechanical or electrical breakdown\n- freezing or frost heave\n- collapse of the line, or of earth surrounding the line\n- **tree and shrub root intrusion**\n- rodent, insect or vermin damage\n- external force including excavation by the insured or a third party\n- artificially generated electrical current"
+              }
+            ]
+          },
+          "latency_ms": 1103,
+          "tokens": 1641
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "deductible HO-3-2026 base form deductible amount",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "claims-adjuster-authority.md",
+                "heading": "3. Deductible application",
+                "page": "p.1",
+                "score": 0.752,
+                "text": "The deductible is applied **once per occurrence**, not once per coverage. Where an\nendorsement carries its own deductible, that deductible replaces the base deductible for\nthe portion of the loss falling under the endorsement:\n\n- Water backup (HO-2026-01): **$500**, replacing the base $1,000\n- Service line (HO-2026-02): **$500**, replacing the base $1,000\n- Equipment breakdown (HO-2026-03): **$500**, replacing the base $1,000\n- Scheduled property (HO-2026-04): **no deductible**\n- Identity fraud (HO-2026-07): **$250**\n\nWhere a single occurrence triggers both a base-form loss and an endorsement loss, apply the\n**base deductible once to the base-form portion** and the endorsement deductible once to\nthe endorsement portion. Do not apply the base deductible to the endorsement portion as\nwell."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.786,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.751,
+                "text": "A **$500 deductible** applies per service line occurrence, in place of the base all-perils\ndeductible."
+              },
+              {
+                "source": "endorsement-HO-2026-06-home-business.md",
+                "heading": "Endorsement HO-2026-06 — Home Business and Home Sharing",
+                "page": "p.1",
+                "score": 0.795,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $96 annual base, plus $40 per additional insured location\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.742,
+                "text": "A **$500 deductible** applies per breakdown occurrence, in place of the base all-perils\ndeductible."
+              }
+            ]
+          },
+          "latency_ms": 3881,
+          "tokens": 2072
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "mechanical breakdown exclusion HO-3-2026 base form",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.799,
+                "text": "Exclusion 10 of the base form excludes mechanical breakdown, latent defect and damage\nfrom artificially generated electrical current. This endorsement **adds back** coverage for\nsudden and accidental **breakdown of covered equipment** at the residence premises."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.751,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-09-equipment-warranty.pdf",
+                "heading": "Endorsement HO-2026-09 - Sump Pump and Mechanical Equipment Warranty Extension",
+                "page": "p.1",
+                "score": 0.685,
+                "text": "Attaches to: HO-3-2026 base form\nEffective: 01 March 2026\nPremium: $38 annual"
+              },
+              {
+                "source": "policy-base-HO3-2026.md",
+                "heading": "Homeowners Policy HO-3 — Base Form (2026 Edition)",
+                "page": "p.1",
+                "score": 0.701,
+                "text": "**Form number:** HO-3-2026\n**Effective:** 01 January 2026\n**Underwriter:** Meridian Mutual Insurance Company\n**Applies to:** All new and renewal homeowners policies written on or after the effective date.\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Endorsement HO-2026-02 — Service Line Coverage",
+                "page": "p.1",
+                "score": 0.674,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $42 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              }
+            ]
+          },
+          "latency_ms": 21083,
+          "tokens": 2651
+        },
+        {
+          "step": 5,
+          "thought": "",
+          "tool": "compute_payout",
+          "args": {
+            "claim_status": "denied",
+            "claimed_amount": 3000,
+            "excess_amount": 0
+          },
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 24364,
+          "tokens": 3191
+        },
+        {
+          "step": 6,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "Section I — Exclusions mechanical breakdown HO-3-2026",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "policy-base-HO3-2026.md",
+                "heading": "Section I — Exclusions",
+                "page": "p.1",
+                "score": 0.745,
+                "text": "The following are excluded under the base form. Some may be added back by endorsement.\n\n1. **Ordinance or law** — increased costs from enforcement of any building code.\n   *May be added back by endorsement HO-2026-05.*\n2. **Earth movement** — earthquake, landslide, sinkhole, mudflow, subsidence.\n3. **Water damage** — flood, surface water, waves, tidal water, overflow of a body of\n   water, and **water which backs up through sewers or drains**.\n   *Sewer and drain backup may be added back by endorsement HO-2026-01.*\n4. **Power failure** occurring off the residence premises.\n5. **Neglect** of an insured to use reasonable means to save and preserve property.\n6. **War**, including undeclared war and civil war.\n7. **Nuclear hazard.**\n8. **Intentional loss** by or at the direction of an insured.\n9. **Governmental action** — seizure or destruction by order of a public authority.\n10. **Wear and tear**, marring, deterioration, mechanical breakdown, latent defect,\n    rust, mould, wet or dry rot, and smog.\n    *Mechanical and electrical breakdown may be added back by endorsement HO-2026-03.*\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.743,
+                "text": "Exclusion 10 of the base form excludes mechanical breakdown, latent defect and damage\nfrom artificially generated electrical current. This endorsement **adds back** coverage for\nsudden and accidental **breakdown of covered equipment** at the residence premises."
+              },
+              {
+                "source": "endorsement-HO-2026-09-equipment-warranty.pdf",
+                "heading": "SECTION 5 - Exclusions",
+                "page": "p.1",
+                "score": 0.685,
+                "text": "This endorsement does not cover:\n- equipment installed by the homeowner without a licensed contractor\n- damage caused by lack of maintenance, including failure to test the pump annually\n- equipment already replaced once under this endorsement in the same policy year"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.698,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Definition of breakdown",
+                "page": "p.1",
+                "score": 0.669,
+                "text": "**Breakdown** means the sudden and accidental physical damage to covered equipment that\nrequires its repair or replacement, arising from:\n\n- mechanical breakdown, including rupture or bursting caused by centrifugal force\n- artificially generated electrical current, including electrical arcing\n- explosion of steam boilers, steam pipes or steam engines\n- loss or damage to hot water heating systems from freezing\n- **power surge originating off the residence premises**, including surge from a utility\n  fault or a lightning strike to the grid\n\nBreakdown does **not** mean wear and tear on its own, gradual deterioration, rust,\ncorrosion, or a defect that has caused no sudden physical damage."
+              }
+            ]
+          },
+          "latency_ms": 24281,
+          "tokens": 3337
+        },
+        {
+          "step": 7,
+          "thought": "{\"answer\":\"The furnace loss is denied because the base HO‑3 policy excludes mechanical breakdown, rust and corrosion (Exclusion 10) and the claim involves long‑term wear and tear rather than a sudden accidental breakdown. No deductible applies to a denied claim. The payout is $0.\",\"decision\":\"denied\",\"payout\":0.0,\"sources\":[\"policy-base-HO3-2026.md\",\"endorsement-HO-2026-03-equipment-breakdown.md\"]}",
+          "tool": "finish (implicit - no tool call made)",
+          "args": {},
+          "result": null,
+          "latency_ms": 95217,
+          "tokens": 4034
+        }
+      ],
+      "step_count": 7,
+      "tokens_used": 18243,
+      "cost_usd": 0.003649,
+      "latency_ms": 170661,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": false
+    },
+    "workflow": {
+      "decision": "denied",
+      "payout": 0.0,
+      "sources": [
+        "3"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2005",
+              "claimed_amount": 3000,
+              "policy_form": "HO-3-2026 (base form only, no equipment endorsement)",
+              "adjuster_notes": "Furnace output has been declining for months. Technician found long-term internal corrosion and rust on the heat exchanger, with no single sudden event reported by the homeowner."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 16
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"denied\",\"excess_amount\":0,\"reasoning\":\"The claim involves long‑term corrosion of the furnace heat exchanger, which is wear and tear, not a sudden breakdown; endorsement HO‑2026‑03 defines breakdown as a sudden physical damage and explicitly excludes wear and tear, rust, or corrosion, and the base policy has no equipment endorsement to cover such damage.\",\"sources\":[\"3\"]}",
+          "latency_ms": 15855,
+          "tokens": 2030
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 2030,
+      "cost_usd": 0.000406,
+      "latency_ms": 15871,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2006",
+    "dependent": false,
+    "expected": {
+      "decision": "approved",
+      "deductible": 500,
+      "payout": 4500,
+      "dependent": false
+    },
+    "agent": {
+      "decision": null,
+      "payout": null,
+      "sources": [],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2006"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2006",
+              "claimed_amount": 5000,
+              "policy_form": "HO-3-2026 + HO-2026-02 (service line)",
+              "adjuster_notes": "Underground water supply line between the street and the house cracked and leaked, undermining a section of the driveway. No third-party excavation involved; line failed from age."
+            }
+          },
+          "latency_ms": 771,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "service line underground water supply line age deductible HO-2026-02",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Definition of service line",
+                "page": "p.1",
+                "score": 0.738,
+                "text": "A **service line** means the underground piping or wiring on the residence premises that\nprovides a utility service to the dwelling, and which the insured is legally responsible to\nmaintain. This includes:\n\n- water supply and sewer lines\n- power, communication and data lines\n- natural gas and steam lines\n- geothermal and drainage piping\n\nService line coverage **begins at the point the line leaves the exterior wall of the\ndwelling** and ends at the utility company's connection point or the boundary of the\nresidence premises, whichever comes first."
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.743,
+                "text": "A **$500 deductible** applies per service line occurrence, in place of the base all-perils\ndeductible."
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Endorsement HO-2026-02 — Service Line Coverage",
+                "page": "p.1",
+                "score": 0.719,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $42 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Exclusions specific to this endorsement",
+                "page": "p.1",
+                "score": 0.75,
+                "text": "This endorsement does not cover:\n\n- service lines **not connected to and serving the dwelling** — for example a line serving\n  only a detached rental structure or a pool house operated as a business;\n- lines the **utility company is responsible to maintain**;\n- **septic tanks and leach fields** themselves, although the piping running to them is\n  covered;\n- loss caused by a service line failure that was **known to the insured before the policy\n  inception**;\n- costs to upgrade a line to meet a **current building code**, unless endorsement\n  HO-2026-05 Ordinance or Law is also attached;\n- damage to the **dwelling foundation** caused by long-term leakage where the leak\n  persisted for more than 30 days before discovery."
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.71,
+                "text": "Provides coverage for the cost to repair or replace a **damaged service line** running\nbetween the dwelling and the utility connection point, together with the excavation and\nrestoration costs that repair requires. Service line failure is otherwise excluded under\nthe base form as wear and tear, deterioration or mechanical breakdown."
+              }
+            ]
+          },
+          "latency_ms": 998,
+          "tokens": 1622
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "compute_payout",
+          "args": {
+            "claim_status": "approved",
+            "claimed_amount": 5000,
+            "excess_amount": 500
+          },
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 4500.0
+            }
+          },
+          "latency_ms": 822,
+          "tokens": 2202
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "finish (implicit - no tool call made)",
+          "args": {},
+          "result": null,
+          "latency_ms": 79211,
+          "tokens": 2724
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 7865,
+      "cost_usd": 0.001573,
+      "latency_ms": 81804,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": false
+    },
+    "workflow": {
+      "decision": "approved",
+      "payout": 4500.0,
+      "sources": [
+        "2",
+        "4",
+        "7"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2006",
+              "claimed_amount": 5000,
+              "policy_form": "HO-3-2026 + HO-2026-02 (service line)",
+              "adjuster_notes": "Underground water supply line between the street and the house cracked and leaked, undermining a section of the driveway. No third-party excavation involved; line failed from age."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 18
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"approved\",\"excess_amount\":500,\"reasoning\":\"The endorsement HO-2026-02 covers damage to a service line on the insured’s side of the utility connection point, including wear and tear and mechanical breakdown, and the FAQ states a $500 deductible applies for such a break.\",\"sources\":[\"2\",\"4\",\"7\"]}",
+          "latency_ms": 10220,
+          "tokens": 1734
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 4500.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 1734,
+      "cost_usd": 0.000347,
+      "latency_ms": 10239,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2007",
+    "dependent": true,
+    "expected": {
+      "decision": "approved",
+      "deductible": 1000,
+      "payout": 119000,
+      "dependent": true
+    },
+    "agent": {
+      "decision": null,
+      "payout": null,
+      "sources": [],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2007"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2007",
+              "claimed_amount": 120000,
+              "policy_form": "HO-3-2026 + HO-2026-08 (roof surfaces ACV)",
+              "adjuster_notes": "House fire started in the attic and destroyed the roof structure and surfacing. Cause of loss confirmed as fire by the fire department report, not wind or hail. Claimed amount of $120,000 already reflects the adjuster's replacement-cost estimate for the roof and attic."
+            }
+          },
+          "latency_ms": 569,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-3-2026 fire coverage roof surfaces ACV deductible",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "Endorsement HO-2026-08 — Roof Surfaces Actual Cash Value and Wind/Hail Schedule",
+                "page": "p.1",
+                "score": 0.817,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** credit of $145 to $410 annually depending on roof age and territory\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.8,
+                "text": "This is a **coverage-restricting endorsement** applied in exchange for a premium credit. It\nchanges the loss settlement basis for **roof surfacing** from replacement cost to\n**actual cash value** where the loss is caused by **windstorm or hail**.\n\nAll other causes of loss to the roof — fire, falling objects, weight of ice and snow,\nvandalism, aircraft, vehicles, explosion — continue to be settled on the base form\nreplacement cost basis. The restriction applies **only** to wind and hail."
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "When this endorsement may not be applied",
+                "page": "p.1",
+                "score": 0.748,
+                "text": "This endorsement may not be attached where:\n\n- the roof surfacing is **less than 5 years old** at policy inception;\n- the dwelling is in a territory where the regulator prohibits roof ACV settlement —\n  currently territories **41, 42 and 47**;\n- the policy is written on the HO-8 modified form."
+              },
+              {
+                "source": "faq-policyholder-endorsements.md",
+                "heading": "My roof was damaged by hail. Why is the cheque less than the estimate?",
+                "page": "p.1",
+                "score": 0.731,
+                "text": "If endorsement HO-2026-08 is on your policy — which you would have accepted in exchange for\na premium credit — the roof surfacing is settled at **actual cash value** for wind and hail\nlosses. We take the replacement cost, subtract your windstorm deductible, then apply\ndepreciation based on the roof's age and material. A 12-year-old asphalt shingle roof\ndepreciates at 5% a year, so about 60% is deducted.\n\nDamage to the **decking, ceilings and interior** is still paid at full replacement cost.\nOnly the outer surfacing is depreciated."
+              },
+              {
+                "source": "policy-base-HO3-2026.md",
+                "heading": "Deductibles",
+                "page": "p.1",
+                "score": 0.73,
+                "text": "The base all-perils deductible is **$1,000 per occurrence**, applied to Section I property\nlosses only. No deductible applies to Coverage E or Coverage F.\n\nA separate **windstorm or hail deductible of 2% of the Coverage A limit** applies in\ndesignated coastal territories, as shown in the Declarations. Where both the all-perils and\nthe windstorm deductible could apply to a single occurrence, only the **larger** of the two\nis deducted.\n\n---"
+              }
+            ]
+          },
+          "latency_ms": 7286,
+          "tokens": 1601
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-3-2026 deductible roof replacement cost",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "faq-policyholder-endorsements.md",
+                "heading": "My roof was damaged by hail. Why is the cheque less than the estimate?",
+                "page": "p.1",
+                "score": 0.751,
+                "text": "If endorsement HO-2026-08 is on your policy — which you would have accepted in exchange for\na premium credit — the roof surfacing is settled at **actual cash value** for wind and hail\nlosses. We take the replacement cost, subtract your windstorm deductible, then apply\ndepreciation based on the roof's age and material. A 12-year-old asphalt shingle roof\ndepreciates at 5% a year, so about 60% is deducted.\n\nDamage to the **decking, ceilings and interior** is still paid at full replacement cost.\nOnly the outer surfacing is depreciated."
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "Endorsement HO-2026-08 — Roof Surfaces Actual Cash Value and Wind/Hail Schedule",
+                "page": "p.1",
+                "score": 0.77,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** credit of $145 to $410 annually depending on roof age and territory\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Endorsement HO-2026-04 — Scheduled Personal Property and Replacement Cost on Contents",
+                "page": "p.1",
+                "score": 0.758,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** rated per scheduled item; $35 policy fee plus item rates\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.72,
+                "text": "This is a **coverage-restricting endorsement** applied in exchange for a premium credit. It\nchanges the loss settlement basis for **roof surfacing** from replacement cost to\n**actual cash value** where the loss is caused by **windstorm or hail**.\n\nAll other causes of loss to the roof — fire, falling objects, weight of ice and snow,\nvandalism, aircraft, vehicles, explosion — continue to be settled on the base form\nreplacement cost basis. The restriction applies **only** to wind and hail."
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "Depreciation schedule",
+                "page": "p.1",
+                "score": 0.75,
+                "text": "Actual cash value is calculated as replacement cost less depreciation, applied by roof age\nand material as follows:\n\n| Roof material | Expected life | Annual depreciation | Maximum depreciation |\n| --- | --- | --- | --- |\n| Composition / asphalt shingle (3-tab) | 20 years | 5.0% per year | 80% |\n| Architectural / laminated shingle | 30 years | 3.3% per year | 70% |\n| Wood shake or shingle | 25 years | 4.0% per year | 75% |\n| Metal panel or standing seam | 40 years | 2.5% per year | 60% |\n| Clay or concrete tile | 50 years | 2.0% per year | 50% |\n| Slate | 60 years | 1.7% per year | 50% |\n| Modified bitumen / built-up flat roof | 20 years | 5.0% per year | 80% |\n\nRoof age is measured from the **date the roof surfacing was last fully replaced**, as\nevidenced by a permit, a contractor invoice, or the underwriting inspection photograph on\nfile. Where the roof age **cannot be established**, the age of the dwelling is used."
+              }
+            ]
+          },
+          "latency_ms": 16018,
+          "tokens": 2121
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-3-2026 deductible roof replacement cost",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "faq-policyholder-endorsements.md",
+                "heading": "My roof was damaged by hail. Why is the cheque less than the estimate?",
+                "page": "p.1",
+                "score": 0.751,
+                "text": "If endorsement HO-2026-08 is on your policy — which you would have accepted in exchange for\na premium credit — the roof surfacing is settled at **actual cash value** for wind and hail\nlosses. We take the replacement cost, subtract your windstorm deductible, then apply\ndepreciation based on the roof's age and material. A 12-year-old asphalt shingle roof\ndepreciates at 5% a year, so about 60% is deducted.\n\nDamage to the **decking, ceilings and interior** is still paid at full replacement cost.\nOnly the outer surfacing is depreciated."
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "Endorsement HO-2026-08 — Roof Surfaces Actual Cash Value and Wind/Hail Schedule",
+                "page": "p.1",
+                "score": 0.77,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** credit of $145 to $410 annually depending on roof age and territory\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Endorsement HO-2026-04 — Scheduled Personal Property and Replacement Cost on Contents",
+                "page": "p.1",
+                "score": 0.758,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** rated per scheduled item; $35 policy fee plus item rates\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.72,
+                "text": "This is a **coverage-restricting endorsement** applied in exchange for a premium credit. It\nchanges the loss settlement basis for **roof surfacing** from replacement cost to\n**actual cash value** where the loss is caused by **windstorm or hail**.\n\nAll other causes of loss to the roof — fire, falling objects, weight of ice and snow,\nvandalism, aircraft, vehicles, explosion — continue to be settled on the base form\nreplacement cost basis. The restriction applies **only** to wind and hail."
+              },
+              {
+                "source": "endorsement-HO-2026-08-roof-surfaces-acv.md",
+                "heading": "Depreciation schedule",
+                "page": "p.1",
+                "score": 0.75,
+                "text": "Actual cash value is calculated as replacement cost less depreciation, applied by roof age\nand material as follows:\n\n| Roof material | Expected life | Annual depreciation | Maximum depreciation |\n| --- | --- | --- | --- |\n| Composition / asphalt shingle (3-tab) | 20 years | 5.0% per year | 80% |\n| Architectural / laminated shingle | 30 years | 3.3% per year | 70% |\n| Wood shake or shingle | 25 years | 4.0% per year | 75% |\n| Metal panel or standing seam | 40 years | 2.5% per year | 60% |\n| Clay or concrete tile | 50 years | 2.0% per year | 50% |\n| Slate | 60 years | 1.7% per year | 50% |\n| Modified bitumen / built-up flat roof | 20 years | 5.0% per year | 80% |\n\nRoof age is measured from the **date the roof surfacing was last fully replaced**, as\nevidenced by a permit, a contractor invoice, or the underwriting inspection photograph on\nfile. Where the roof age **cannot be established**, the age of the dwelling is used."
+              }
+            ]
+          },
+          "latency_ms": 22764,
+          "tokens": 2755
+        },
+        {
+          "step": 5,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-3-2026 deductible amount",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.771,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-06-home-business.md",
+                "heading": "Endorsement HO-2026-06 — Home Business and Home Sharing",
+                "page": "p.1",
+                "score": 0.777,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $96 annual base, plus $40 per additional insured location\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.71,
+                "text": "**No deductible applies** to scheduled items. The base all-perils deductible of $1,000 does\nnot apply to a loss involving only scheduled property."
+              },
+              {
+                "source": "claims-adjuster-authority.md",
+                "heading": "3. Deductible application",
+                "page": "p.1",
+                "score": 0.7,
+                "text": "The deductible is applied **once per occurrence**, not once per coverage. Where an\nendorsement carries its own deductible, that deductible replaces the base deductible for\nthe portion of the loss falling under the endorsement:\n\n- Water backup (HO-2026-01): **$500**, replacing the base $1,000\n- Service line (HO-2026-02): **$500**, replacing the base $1,000\n- Equipment breakdown (HO-2026-03): **$500**, replacing the base $1,000\n- Scheduled property (HO-2026-04): **no deductible**\n- Identity fraud (HO-2026-07): **$250**\n\nWhere a single occurrence triggers both a base-form loss and an endorsement loss, apply the\n**base deductible once to the base-form portion** and the endorsement deductible once to\nthe endorsement portion. Do not apply the base deductible to the endorsement portion as\nwell."
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.727,
+                "text": "A **$500 deductible** applies per service line occurrence, in place of the base all-perils\ndeductible."
+              }
+            ]
+          },
+          "latency_ms": 16509,
+          "tokens": 3328
+        },
+        {
+          "step": 6,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-3-2026 deductible $1,000",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.719,
+                "text": "**No deductible applies** to scheduled items. The base all-perils deductible of $1,000 does\nnot apply to a loss involving only scheduled property."
+              },
+              {
+                "source": "claims-adjuster-authority.md",
+                "heading": "3. Deductible application",
+                "page": "p.1",
+                "score": 0.71,
+                "text": "The deductible is applied **once per occurrence**, not once per coverage. Where an\nendorsement carries its own deductible, that deductible replaces the base deductible for\nthe portion of the loss falling under the endorsement:\n\n- Water backup (HO-2026-01): **$500**, replacing the base $1,000\n- Service line (HO-2026-02): **$500**, replacing the base $1,000\n- Equipment breakdown (HO-2026-03): **$500**, replacing the base $1,000\n- Scheduled property (HO-2026-04): **no deductible**\n- Identity fraud (HO-2026-07): **$250**\n\nWhere a single occurrence triggers both a base-form loss and an endorsement loss, apply the\n**base deductible once to the base-form portion** and the endorsement deductible once to\nthe endorsement portion. Do not apply the base deductible to the endorsement portion as\nwell."
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Endorsement HO-2026-01 — Water Backup and Sump Discharge or Overflow",
+                "page": "p.1",
+                "score": 0.731,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $68 annual, or $112 annual at the $25,000 limit option\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Endorsement HO-2026-03 — Home Equipment Breakdown",
+                "page": "p.1",
+                "score": 0.758,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $55 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-06-home-business.md",
+                "heading": "Endorsement HO-2026-06 — Home Business and Home Sharing",
+                "page": "p.1",
+                "score": 0.768,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $96 annual base, plus $40 per additional insured location\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              }
+            ]
+          },
+          "latency_ms": 21491,
+          "tokens": 4027
+        },
+        {
+          "step": 7,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-3-2026 base all-perils deductible $1,000",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.833,
+                "text": "**No deductible applies** to scheduled items. The base all-perils deductible of $1,000 does\nnot apply to a loss involving only scheduled property."
+              },
+              {
+                "source": "policy-base-HO3-2026.md",
+                "heading": "Deductibles",
+                "page": "p.1",
+                "score": 0.847,
+                "text": "The base all-perils deductible is **$1,000 per occurrence**, applied to Section I property\nlosses only. No deductible applies to Coverage E or Coverage F.\n\nA separate **windstorm or hail deductible of 2% of the Coverage A limit** applies in\ndesignated coastal territories, as shown in the Declarations. Where both the all-perils and\nthe windstorm deductible could apply to a single occurrence, only the **larger** of the two\nis deducted.\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.753,
+                "text": "A **separate deductible of $500** applies to each water backup occurrence. This deductible\napplies **instead of**, not in addition to, the base all-perils deductible of $1,000."
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.822,
+                "text": "A **$500 deductible** applies per breakdown occurrence, in place of the base all-perils\ndeductible."
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.816,
+                "text": "A **$500 deductible** applies per service line occurrence, in place of the base all-perils\ndeductible."
+              }
+            ]
+          },
+          "latency_ms": 34401,
+          "tokens": 4677
+        },
+        {
+          "step": 8,
+          "thought": "",
+          "tool": "check_settlement_authority",
+          "args": {
+            "payout_amount": 119000
+          },
+          "result": {
+            "result": {
+              "required_grade": "senior_field_adjuster",
+              "authority_limit": 150000
+            }
+          },
+          "latency_ms": 31421,
+          "tokens": 5131
+        }
+      ],
+      "step_count": 8,
+      "tokens_used": 24957,
+      "cost_usd": 0.004991,
+      "latency_ms": 150463,
+      "stopped_reason": "iteration_limit",
+      "finished": false,
+      "passed": false
+    },
+    "workflow": {
+      "decision": "approved",
+      "payout": 119000.0,
+      "sources": [
+        "endorsement-HO-2026-08-roof-surfaces-acv.md",
+        "policy-base-HO3-2026.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2007",
+              "claimed_amount": 120000,
+              "policy_form": "HO-3-2026 + HO-2026-08 (roof surfaces ACV)",
+              "adjuster_notes": "House fire started in the attic and destroyed the roof structure and surfacing. Cause of loss confirmed as fire by the fire department report, not wind or hail. Claimed amount of $120,000 already reflects the adjuster's replacement-cost estimate for the roof and attic."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 24
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"approved\",\"excess_amount\":1000,\"reasoning\":\"The endorsement HO-2026-08 limits ACV only to windstorm or hail losses, so a fire loss is settled at replacement cost per the policy base; the base all‑perils deductible of $1,000 applies per policy‑base HO‑3‑2026.\",\"sources\":[\"endorsement-HO-2026-08-roof-surfaces-acv.md\",\"policy-base-HO3-2026.md\"]}",
+          "latency_ms": 5261,
+          "tokens": 1908
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 119000.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 1908,
+      "cost_usd": 0.000382,
+      "latency_ms": 5286,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2008",
+    "dependent": false,
+    "expected": {
+      "decision": "approved",
+      "deductible": 250,
+      "payout": 1550,
+      "dependent": false
+    },
+    "agent": {
+      "decision": "approved",
+      "payout": 1550,
+      "sources": [
+        "endorsement-HO-2026-07-identity-fraud.md",
+        "claims-adjuster-authority.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2008"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2008",
+              "claimed_amount": 1800,
+              "policy_form": "HO-3-2026 + HO-2026-07 (identity fraud)",
+              "adjuster_notes": "Policyholder's identity was used to open a fraudulent credit line. Out-of-pocket costs of $1,800 for credit monitoring, notarized affidavits and lost wages attending resolution meetings, documented by receipts."
+            }
+          },
+          "latency_ms": 976,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "identity fraud endorsement HO-2026-07 deductible",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-07-identity-fraud.md",
+                "heading": "Endorsement HO-2026-07 — Identity Fraud and Cyber Event Expense",
+                "page": "p.1",
+                "score": 0.892,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** $29 annual\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-07-identity-fraud.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.884,
+                "text": "A **$250 deductible** applies per identity fraud or cyber event."
+              },
+              {
+                "source": "endorsement-HO-2026-07-identity-fraud.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.824,
+                "text": "Adds expense reimbursement coverage for an insured who is the victim of an **identity fraud\nevent** or a **personal cyber event**. This is an expense-reimbursement coverage, not a\nliability coverage."
+              },
+              {
+                "source": "claims-adjuster-authority.md",
+                "heading": "3. Deductible application",
+                "page": "p.1",
+                "score": 0.737,
+                "text": "The deductible is applied **once per occurrence**, not once per coverage. Where an\nendorsement carries its own deductible, that deductible replaces the base deductible for\nthe portion of the loss falling under the endorsement:\n\n- Water backup (HO-2026-01): **$500**, replacing the base $1,000\n- Service line (HO-2026-02): **$500**, replacing the base $1,000\n- Equipment breakdown (HO-2026-03): **$500**, replacing the base $1,000\n- Scheduled property (HO-2026-04): **no deductible**\n- Identity fraud (HO-2026-07): **$250**\n\nWhere a single occurrence triggers both a base-form loss and an endorsement loss, apply the\n**base deductible once to the base-form portion** and the endorsement deductible once to\nthe endorsement portion. Do not apply the base deductible to the endorsement portion as\nwell."
+              },
+              {
+                "source": "endorsement-HO-2026-07-identity-fraud.md",
+                "heading": "Claim handling note",
+                "page": "p.1",
+                "score": 0.716,
+                "text": "Identity fraud claims are handled by the **Specialty Lines desk**, not the property team.\nFirst contact target is **two business days**. A completed **Identity Theft Affidavit** and\nthe police report reference number are required before any expense is reimbursed.\nRansomware claims must be escalated to the Cyber duty manager **before** any payment is\ndiscussed with the insured."
+              }
+            ]
+          },
+          "latency_ms": 4653,
+          "tokens": 1603
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "check_settlement_authority",
+          "args": {
+            "payout_amount": 1550
+          },
+          "result": {
+            "result": {
+              "required_grade": "desk_adjuster_grade_1",
+              "authority_limit": 10000
+            }
+          },
+          "latency_ms": 6977,
+          "tokens": 2153
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "compute_payout",
+          "args": {
+            "claim_status": "approved",
+            "claimed_amount": 1800,
+            "excess_amount": 250
+          },
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 1550.0
+            }
+          },
+          "latency_ms": 17078,
+          "tokens": 2290
+        },
+        {
+          "step": 5,
+          "thought": "",
+          "tool": "finish",
+          "args": {
+            "answer": "Approved, payout 1550. (endorsement-HO-2026-07-identity-fraud.md: Deductible; claims-adjuster-authority.md: Deductible application)",
+            "decision": "approved",
+            "payout": 1550,
+            "sources": [
+              "endorsement-HO-2026-07-identity-fraud.md",
+              "claims-adjuster-authority.md"
+            ]
+          },
+          "result": null,
+          "latency_ms": 17746,
+          "tokens": 2682
+        }
+      ],
+      "step_count": 5,
+      "tokens_used": 10045,
+      "cost_usd": 0.002009,
+      "latency_ms": 47432,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    },
+    "workflow": {
+      "decision": "partial",
+      "payout": 1550.0,
+      "sources": [
+        "endorsement-HO-2026-07-identity-fraud.md",
+        "faq-policyholder-endorsements.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2008",
+              "claimed_amount": 1800,
+              "policy_form": "HO-3-2026 + HO-2026-07 (identity fraud)",
+              "adjuster_notes": "Policyholder's identity was used to open a fraudulent credit line. Out-of-pocket costs of $1,800 for credit monitoring, notarized affidavits and lost wages attending resolution meetings, documented by receipts."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 21
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"partial\",\"excess_amount\":250,\"reasoning\":\"The endorsement HO‑2026‑07 covers legal fees, lost wages (up to $500/week) and notarized affidavits (sub‑limits $10,000, $5,000, $2,000 respectively) but credit monitoring is provided as a service with no cash value, so that portion is not reimbursed; a $250 deductible applies to the covered expenses.\",\"sources\":[\"endorsement-HO-2026-07-identity-fraud.md\",\"faq-policyholder-endorsements.md\"]}",
+          "latency_ms": 17860,
+          "tokens": 2588
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "partial",
+              "payout": 1550.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 2588,
+      "cost_usd": 0.000518,
+      "latency_ms": 17882,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": false
+    }
+  },
+  {
+    "claim_id": "CLM-2009",
+    "dependent": false,
+    "expected": {
+      "decision": "denied",
+      "deductible": null,
+      "payout": 0,
+      "dependent": false
+    },
+    "agent": {
+      "decision": "denied",
+      "payout": 0,
+      "sources": [
+        "policy-base-HO3-2026.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2009"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2009",
+              "claimed_amount": 15000,
+              "policy_form": "HO-3-2026 (base form only)",
+              "adjuster_notes": "Detached shed destroyed by fire. Investigation, including the insured's own statement, established the insured set the fire deliberately to collect insurance proceeds. Local fire marshal's report supports arson by the insured."
+            }
+          },
+          "latency_ms": 1039,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "compute_payout",
+          "args": {
+            "claim_status": "denied",
+            "claimed_amount": 15000,
+            "excess_amount": 0
+          },
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 648,
+          "tokens": 1516
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "intentional acts exclusion HO-3",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "policy-base-HO3-2026.md",
+                "heading": "Section I — Exclusions",
+                "page": "p.1",
+                "score": 0.7,
+                "text": "The following are excluded under the base form. Some may be added back by endorsement.\n\n1. **Ordinance or law** — increased costs from enforcement of any building code.\n   *May be added back by endorsement HO-2026-05.*\n2. **Earth movement** — earthquake, landslide, sinkhole, mudflow, subsidence.\n3. **Water damage** — flood, surface water, waves, tidal water, overflow of a body of\n   water, and **water which backs up through sewers or drains**.\n   *Sewer and drain backup may be added back by endorsement HO-2026-01.*\n4. **Power failure** occurring off the residence premises.\n5. **Neglect** of an insured to use reasonable means to save and preserve property.\n6. **War**, including undeclared war and civil war.\n7. **Nuclear hazard.**\n8. **Intentional loss** by or at the direction of an insured.\n9. **Governmental action** — seizure or destruction by order of a public authority.\n10. **Wear and tear**, marring, deterioration, mechanical breakdown, latent defect,\n    rust, mould, wet or dry rot, and smog.\n    *Mechanical and electrical breakdown may be added back by endorsement HO-2026-03.*\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-01-water-backup.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.65,
+                "text": "Exclusion 3 of the base form excludes water which backs up through sewers or drains. This\nendorsement **deletes that portion of the exclusion** and adds the coverage described\nbelow. All other terms of exclusion 3 — including flood, surface water and overflow of a\nbody of water — remain fully excluded and are **not** restored by this endorsement."
+              },
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Exclusions specific to this endorsement",
+                "page": "p.1",
+                "score": 0.662,
+                "text": "Scheduled property coverage does not apply to loss caused by:\n\n- **wear and tear**, gradual deterioration, insects or vermin\n- **inherent vice** or any repairing, restoring or retouching process\n- **mysterious disappearance of unscheduled items** — this remains a Coverage C theft\n  question under the base form\n- breakage of fragile articles such as glassware or porcelain, **unless** caused by fire,\n  theft, vandalism, or the collapse of a building — this breakage exclusion does not apply\n  to scientific instruments, cameras or musical instruments\n- loss occurring while the property is in the custody of a **transportation carrier** for\n  stamp or coin collections"
+              },
+              {
+                "source": "endorsement-HO-2026-03-equipment-breakdown.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.634,
+                "text": "Exclusion 10 of the base form excludes mechanical breakdown, latent defect and damage\nfrom artificially generated electrical current. This endorsement **adds back** coverage for\nsudden and accidental **breakdown of covered equipment** at the residence premises."
+              },
+              {
+                "source": "endorsement-HO-2026-05-ordinance-or-law.md",
+                "heading": "What this endorsement does",
+                "page": "p.1",
+                "score": 0.629,
+                "text": "Exclusion 1 of the base form excludes the increased cost of construction that results from\nenforcement of a building code, ordinance or law. This endorsement **increases the\nordinance or law allowance** to the percentage of the Coverage A limit shown in the\nDeclarations.\n\nWithout this endorsement, the base form provides an ordinance or law allowance of\n**10% of the Coverage A limit**. With this endorsement, the allowance is increased to\neither **25%** or **50%** of the Coverage A limit, as elected."
+              }
+            ]
+          },
+          "latency_ms": 2607,
+          "tokens": 1603
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "finish",
+          "args": {
+            "answer": "The claim is denied because the loss is an intentional act, which is excluded under the base HO‑3 policy. The payout is $0.00.",
+            "decision": "denied",
+            "payout": 0,
+            "sources": [
+              "policy-base-HO3-2026.md"
+            ]
+          },
+          "result": null,
+          "latency_ms": 77845,
+          "tokens": 2363
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 6799,
+      "cost_usd": 0.00136,
+      "latency_ms": 82140,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    },
+    "workflow": {
+      "decision": "denied",
+      "payout": 0.0,
+      "sources": [
+        "policy-base-HO3-2026.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2009",
+              "claimed_amount": 15000,
+              "policy_form": "HO-3-2026 (base form only)",
+              "adjuster_notes": "Detached shed destroyed by fire. Investigation, including the insured's own statement, established the insured set the fire deliberately to collect insurance proceeds. Local fire marshal's report supports arson by the insured."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 22
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"denied\",\"excess_amount\":0,\"reasoning\":\"The policy’s Coverage A only covers the dwelling and structures attached to it; a detached shed is not covered under the base form (policy-base-HO3-2026, Coverage A – Dwelling).\",\"sources\":[\"policy-base-HO3-2026.md\"]}",
+          "latency_ms": 15631,
+          "tokens": 1846
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "denied",
+              "payout": 0.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 1846,
+      "cost_usd": 0.000369,
+      "latency_ms": 15654,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  },
+  {
+    "claim_id": "CLM-2010",
+    "dependent": true,
+    "expected": {
+      "decision": "approved",
+      "deductible": 0,
+      "payout": 8000,
+      "dependent": true
+    },
+    "agent": {
+      "decision": null,
+      "payout": null,
+      "sources": [],
+      "steps": [
+        {
+          "step": 1,
+          "thought": "",
+          "tool": "get_claim",
+          "args": {
+            "claim_id": "CLM-2010"
+          },
+          "result": {
+            "result": {
+              "claim_id": "CLM-2010",
+              "claimed_amount": 8000,
+              "policy_form": "HO-3-2026 + HO-2026-04 (scheduled property)",
+              "adjuster_notes": "Engagement ring, scheduled on the policy at an agreed value of $8,000, stolen from the home during a break-in. Police report filed same day."
+            }
+          },
+          "latency_ms": 890,
+          "tokens": 1317
+        },
+        {
+          "step": 2,
+          "thought": "",
+          "tool": "search_policy",
+          "args": {
+            "query": "HO-2026-04 scheduled property deductible",
+            "top_k": 5
+          },
+          "result": {
+            "result": [
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Endorsement HO-2026-04 — Scheduled Personal Property and Replacement Cost on Contents",
+                "page": "p.1",
+                "score": 0.821,
+                "text": "**Attaches to:** HO-3-2026 base form\n**Effective:** 01 March 2026\n**Premium:** rated per scheduled item; $35 policy fee plus item rates\n**Endorsement pack:** 2026 Spring Release\n\n---"
+              },
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.821,
+                "text": "**No deductible applies** to scheduled items. The base all-perils deductible of $1,000 does\nnot apply to a loss involving only scheduled property."
+              },
+              {
+                "source": "endorsement-HO-2026-04-scheduled-property.md",
+                "heading": "Part 2 — Scheduled personal property",
+                "page": "p.1",
+                "score": 0.743,
+                "text": "Individually listed items are covered for the **agreed value** shown on the schedule, on an\n**all-risk** basis, anywhere in the world. Scheduling an item removes it from the base form\nspecial limits of liability shown in the base policy table."
+              },
+              {
+                "source": "claims-adjuster-authority.md",
+                "heading": "3. Deductible application",
+                "page": "p.1",
+                "score": 0.707,
+                "text": "The deductible is applied **once per occurrence**, not once per coverage. Where an\nendorsement carries its own deductible, that deductible replaces the base deductible for\nthe portion of the loss falling under the endorsement:\n\n- Water backup (HO-2026-01): **$500**, replacing the base $1,000\n- Service line (HO-2026-02): **$500**, replacing the base $1,000\n- Equipment breakdown (HO-2026-03): **$500**, replacing the base $1,000\n- Scheduled property (HO-2026-04): **no deductible**\n- Identity fraud (HO-2026-07): **$250**\n\nWhere a single occurrence triggers both a base-form loss and an endorsement loss, apply the\n**base deductible once to the base-form portion** and the endorsement deductible once to\nthe endorsement portion. Do not apply the base deductible to the endorsement portion as\nwell."
+              },
+              {
+                "source": "endorsement-HO-2026-02-service-line.md",
+                "heading": "Deductible",
+                "page": "p.1",
+                "score": 0.722,
+                "text": "A **$500 deductible** applies per service line occurrence, in place of the base all-perils\ndeductible."
+              }
+            ]
+          },
+          "latency_ms": 1483,
+          "tokens": 1522
+        },
+        {
+          "step": 3,
+          "thought": "",
+          "tool": "check_settlement_authority",
+          "args": {
+            "payout_amount": 8000
+          },
+          "result": {
+            "result": {
+              "required_grade": "desk_adjuster_grade_1",
+              "authority_limit": 10000
+            }
+          },
+          "latency_ms": 6921,
+          "tokens": 2083
+        },
+        {
+          "step": 4,
+          "thought": "",
+          "tool": "finish (rejected - compute_payout not yet called)",
+          "args": {
+            "answer": "The engagement ring is a scheduled item under endorsement HO‑2026‑04, which carries no deductible. The loss is fully covered, so the payout is $8,000. The amount is within the desk adjuster grade 1 authority limit of $10,000.",
+            "decision": "approved",
+            "payout": 8000,
+            "sources": [
+              "endorsement-HO-2026-04-scheduled-property.md",
+              "claims-adjuster-authority.md"
+            ]
+          },
+          "result": null,
+          "latency_ms": 15986,
+          "tokens": 2248
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 7170,
+      "cost_usd": 0.0,
+      "latency_ms": 0,
+      "stopped_reason": "error",
+      "finished": false,
+      "passed": false,
+      "error": "The language model service returned an error. Please try again."
+    },
+    "workflow": {
+      "decision": "approved",
+      "payout": 8000.0,
+      "sources": [
+        "endorsement-HO-2026-04-scheduled-property.md",
+        "faq-policyholder-endorsements.md"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "action": "get_claim (fixed)",
+          "result": {
+            "result": {
+              "claim_id": "CLM-2010",
+              "claimed_amount": 8000,
+              "policy_form": "HO-3-2026 + HO-2026-04 (scheduled property)",
+              "adjuster_notes": "Engagement ring, scheduled on the policy at an agreed value of $8,000, stolen from the home during a break-in. Police report filed same day."
+            }
+          },
+          "latency_ms": 0
+        },
+        {
+          "step": 2,
+          "action": "search_policy (fixed, query = adjuster notes, top_k=8)",
+          "result_count": 8,
+          "latency_ms": 22
+        },
+        {
+          "step": 3,
+          "action": "generate coverage decision from the fixed retrieval",
+          "raw": "{\"claim_status\":\"approved\",\"excess_amount\":0,\"reasoning\":\"The engagement ring is scheduled under endorsement HO-2026-04, which covers individually listed items for the agreed value on an all‑risk basis worldwide and removes them from base policy limits, and scheduled items have no deductible per the FAQ.\",\"sources\":[\"endorsement-HO-2026-04-scheduled-property.md\",\"faq-policyholder-endorsements.md\"]}",
+          "latency_ms": 1194,
+          "tokens": 2125
+        },
+        {
+          "step": 4,
+          "action": "compute_payout (fixed)",
+          "result": {
+            "result": {
+              "claim_status": "approved",
+              "payout": 8000.0
+            }
+          },
+          "latency_ms": 0
+        }
+      ],
+      "step_count": 4,
+      "tokens_used": 2125,
+      "cost_usd": 0.000425,
+      "latency_ms": 1216,
+      "stopped_reason": "finished",
+      "finished": true,
+      "passed": true
+    }
+  }
+]

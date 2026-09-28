@@ -1,7 +1,7 @@
 """
-A dedicated, deterministic demonstration that the triage agent's budgets
-actually stop it - not just that the constants exist. Runs a real claim
-through ClaimTriageAgent with a deliberately tiny `max_iterations`, so the
+A dedicated, deterministic demonstration that the agent's budgets actually
+stop it - not just that the constants exist. Runs a real claim through
+ClaimAgent with a deliberately tiny `max_iterations`, so the
 task's own request for "the log of one run that hits a budget and
 terminates cleanly instead of spinning" doesn't depend on hoping the race's
 10 claims happen to trip one.
@@ -19,8 +19,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+from app.services.agent_service import ClaimAgent  # noqa: E402
 from app.services.retrieval_service import RetrievalService  # noqa: E402
-from app.services.triage_agent import ClaimTriageAgent  # noqa: E402
 
 LOG_PATH = REPO_ROOT / "docs" / "training" / "week7" / "budget_termination_log.txt"
 
@@ -43,7 +43,7 @@ def main() -> int:
         print("The index is empty. Run: python scripts/ingest.py")
         return 1
 
-    agent = ClaimTriageAgent(retriever=retriever)
+    agent = ClaimAgent(retriever=retriever)
     result = agent.run(CLAIM_ID, max_iterations=MAX_ITERATIONS)
 
     lines = [
