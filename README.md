@@ -7,19 +7,27 @@ documents do not cover the question, and an Angular 22 frontend that makes all
 of it usable without knowing what RAG is.
 
 ```
-┌──────────────── Angular 22 (frontend/) ─────────────────┐
-│ Chat · Documents · Evaluation · Analytics · Settings     │
+┌────────────── Angular 22 (frontend/) ───────────────────┐
+│ Chat · Documents · Evaluation · Analytics · Agent · ...  │
 │ Developer: retrieval inspector · traces · replay        │
 └───────────────────────────┬─────────────────────────────┘
                             │ /api/v1
 ┌───────────────────────────▼─────────────────────────────┐
 │ FastAPI (app/)                                          │
 │  chat/search · documents/index · evaluation · traces    │
-│  RAGService → RetrievalService → Qdrant (embedded)      │
+│  agent (ClaimAgent) → MCPToolClient ──┐                 │
+│  RAGService → RetrievalService → Qdrant (embedded)   ◄──┼── search_policy proxies here
 │             → LLMService (Groq)   fastembed bge-small   │
 │  hybrid BM25+RRF · cross-encoder rerank · MMR · HyDE    │
 │  redacting trace log · golden-set evaluation            │
-└─────────────────────────────────────────────────────────┘
+└──────────────────────────────────────┬───────────────────┘
+                                       │ MCP (streamable HTTP, :8100)
+                    ┌──────────────────▼──────────────────┐
+                    │ claims-system MCP server              │
+                    │ (mcp_servers/) - standalone process,  │
+                    │ no LLM ever runs here - get_claim,    │
+                    │ compute_payout, search_policy, ...    │
+                    └────────────────────────────────────────┘
 ```
 
 ---
@@ -38,6 +46,19 @@ copy .env.example .env        # add your GROQ_API_KEY (console.groq.com/keys)
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
+**Claims agent (Agent tab)** - two more standalone processes, one per terminal:
+
+```powershell
+.\.venv\Scripts\python.exe -m mcp_servers.claims_system_server    # :8100, needs the app above running too
+.\.venv\Scripts\python.exe -m mcp_servers.claims_status_server    # :8101
+```
+
+The agent discovers its tools from `mcp_config.json`'s server list over MCP
+at runtime (see `docs/training/week9/task_set_d.md`) rather than having them
+wired in by hand - adding a server is a one-line config edit, never a code
+change (`docs/training/week9/agent_diff.txt` proves it). Only the Agent tab
+needs these two processes; everything else works without them.
+
 **Frontend**
 
 ```bash
@@ -53,7 +74,10 @@ Interactive API docs: `http://127.0.0.1:8000/docs`.
 
 > **Embedded Qdrant lock.** Qdrant runs inside the API process and locks
 > `.qdrant/` to one process at a time. Stop the server before running the CLI
-> scripts, or point `QDRANT_PATH`/a Qdrant server at a shared instance.
+> scripts, or point `QDRANT_PATH`/a Qdrant server at a shared instance. The
+> claims-system MCP server avoids this the same way: its `search_policy`
+> tool proxies to the main app's own `/api/v1/search` over HTTP rather than
+> opening a second Qdrant client - so it needs the main app running.
 
 Only answer generation needs the Groq key. Without it the app starts, indexes
 and retrieves; Chat reports that generation is not configured (HTTP 503).

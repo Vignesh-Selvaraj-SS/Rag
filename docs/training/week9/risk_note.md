@@ -1,0 +1,5 @@
+**Who wrote it:** In this exercise, we did — but evaluated as the task frames it: a different team (the "claims platform team") owns its release cycle, so our agent trusts code we don't review and can't gate.
+**What it can reach:** Only `evaluation/triage_claims.json`'s fixture records, read-only, via `get_claim_record()` — no other files, no network egress, no write path anywhere.
+**What it logs:** Nothing beyond uvicorn's default request line (method, path, timestamp) — no claim ID or adjuster-note content is written to any log by this server's own code.
+**What a stolen token could do:** There is no token — this server has zero authentication, so the real risk isn't a stolen credential, it's that anyone who can reach port 8101 already has full read access to every claim's adjuster notes, no theft required.
+**Ship or don't:** Don't, past localhost — fine for this exercise bound to 127.0.0.1, but reachable-from-anywhere-else without auth or TLS means shipping it as-is hands out every adjuster note on the platform to whoever finds the port.

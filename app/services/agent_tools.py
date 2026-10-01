@@ -1,5 +1,5 @@
 """
-The tools the merged claim agent can call: general policy Q&A tools
+The claims-system tool implementations: general policy Q&A tools
 (`search_policy`, `list_documents`) plus the claim-triage tools that used to
 live in a separate `triage_tools.py` before `ClaimAgent`/`ClaimTriageAgent`
 were merged into one class - `get_claim`, `compute_payout`, and two further
@@ -17,12 +17,19 @@ agent logs and feeds back into the next prompt. A tool never raises for a
 bad but plausible call - it returns an error string in the result instead,
 so a single bad tool call costs one step, not the whole run.
 
-The merge restores `search_policy`'s description to reference `list_documents`
-again for file-name discovery - the triage-only version of this file had
-rewritten that reference away, since the triage agent never had
-`list_documents` before. Now it does, so the original wording applies again.
-The `_resolve_source` fix (below) still stays regardless: it protects
-against a guessed name whether or not `list_documents` was actually called.
+Week 9: these functions are no longer called directly by `ClaimAgent` (an
+in-process if/elif dispatch by tool name). They are wrapped, unchanged, by
+`mcp_servers/claims_system_server.py` (or, for `get_claim`, the separate
+`mcp_servers/claims_status_server.py` - see Task Set D's docstring there
+for why it's split out) and exposed over MCP - the agent discovers and
+calls them through `app/services/mcp_client.py` instead, so this module
+stays the single place the actual claims-system logic lives, reused (not
+reimplemented) by every MCP server and this file's own `_resolve_source`
+fix below.
+
+`search_policy`'s description references `list_documents` for file-name
+discovery, so a specific-document search doesn't have to guess a source
+name it was never told.
 """
 
 import re
@@ -158,12 +165,17 @@ def get_claim(args: dict) -> dict:
     claim_id = str(args.get("claim_id") or "").strip()
 
     if not claim_id:
-        return {"error": "get_claim needs a non-empty 'claim_id'."}
+        return {"error": "get_claim needs a non-empty 'claim_id', formatted like CLM-YYYY-nnnnn, e.g. CLM-2001."}
 
     record = get_claim_record(claim_id)
 
     if record is None:
-        return {"error": f"No claim found with id {claim_id!r}."}
+        # Week 9 Task Set D: recoverable, not "Error: lookup failed" - names
+        # what was tried and what a valid one looks like, so the model can
+        # tell a typo'd claim number apart from a genuinely dead claims
+        # system (a materially different situation - see error_before_after.md)
+        # instead of quietly answering about coverage with no claim loaded.
+        return {"error": f"claim {claim_id!r} not found: claim numbers look like CLM-YYYY-nnnnn, e.g. CLM-2001."}
 
     return {
         "result": {
@@ -261,188 +273,11 @@ def flag_for_review(args: dict) -> dict:
     return {"result": f"Claim {claim_id} flagged for human review: {reason}"}
 
 
-# Tool schemas in the OpenAI/Groq function-calling shape. This model
-# (openai/gpt-oss-20b) has a built-in, server-enforced notion of "the model
-# called a tool" - asking it to hand-write tool-shaped JSON as plain text
-# collides with that (Groq rejects it: "Tool choice is none, but model
-# called a tool") rather than just being parsed as text. Declaring the
-# tools properly through `tools=` and reading `message.tool_calls` uses the
-# API the way it is actually built, instead of fighting it.
-#
-# `finish` is unified across both jobs this agent can do: a pure policy
-# question leaves `decision`/`payout` null; a claim triage fills them in and
-# still writes a prose `answer` restating the decision. One contract, two
-# legitimate shapes of its content - not two contracts.
-TOOL_SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "search_policy",
-            "description": (
-                "Search the indexed policy and procedure documents for text relevant to "
-                "the query. Never returns claim-specific facts (amount, notes, peril) - that "
-                "is get_claim's job. Never use this to check an adjuster's settlement "
-                "authority - call check_settlement_authority instead, which is exact and "
-                "faster than searching for the authority table in text. Leave `source` "
-                "unset to search everything. Set `source` to one exact file name (from "
-                "list_documents) only once you already suspect the fact you need lives in "
-                "that specific document - for example, a specific endorsement or claims "
-                "procedure question."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "What to look up."},
-                    "source": {"type": "string", "description": "An exact file name to restrict the search to, or omit to search everything."},
-                    "top_k": {"type": "integer", "description": "How many chunks to return, default 5."},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_documents",
-            "description": "List the exact file names of every indexed document, so a later search_policy call can name a document that actually exists.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_claim",
-            "description": (
-                "Retrieve the case file for ONE claim by its claim ID: claimed amount, "
-                "policy form and endorsements attached, and the adjuster's notes describing "
-                "what happened. This is the only tool that returns claim-specific facts - it "
-                "never returns policy wording, exclusions or deductible amounts. Only call "
-                "this when the input actually names a claim ID (CLM-####) - never for a "
-                "general policy question with no claim to pull. Call it exactly once per "
-                "claim, first."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "claim_id": {"type": "string", "description": "The claim ID, e.g. 'CLM-2001'."},
-                },
-                "required": ["claim_id"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "compute_payout",
-            "description": (
-                "Compute the payable amount after the excess/deductible has been subtracted. "
-                "Only relevant when triaging a specific claim (never for a general policy "
-                "question). Call this only after you already know, from search_policy, "
-                "whether the loss is covered and what deductible applies - this tool does no "
-                "coverage lookups of its own, it only does the arithmetic once you supply the "
-                "numbers."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "claimed_amount": {"type": "number", "description": "The amount claimed."},
-                    "excess_amount": {"type": "number", "description": "The applicable deductible/excess. Use 0 if none applies or the claim is denied."},
-                    "claim_status": {
-                        "type": "string",
-                        "enum": CLAIM_STATUSES,
-                        "description": "Your coverage decision: 'approved' (fully covered), 'denied' (not covered, payout is 0), or 'partial' (part of the loss is excluded).",
-                    },
-                },
-                "required": ["claimed_amount", "excess_amount", "claim_status"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "check_settlement_authority",
-            "description": (
-                "Look up which adjuster grade's settlement authority covers a payout amount. "
-                "Does not decide coverage or compute the payout itself - call this only after "
-                "compute_payout, to check who is allowed to approve the resulting number."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "payout_amount": {"type": "number", "description": "The payout amount to check, exactly as compute_payout returned it."},
-                },
-                "required": ["payout_amount"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "flag_for_review",
-            "description": (
-                "Escalate a claim for human review instead of finishing it - the only action/"
-                "write tool available; every other tool reads or computes. Use this instead of "
-                "`finish` when the claim genuinely can't be resolved from the available tools."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "claim_id": {"type": "string"},
-                    "reason": {"type": "string", "description": "Why this claim needs human review."},
-                },
-                "required": ["claim_id", "reason"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "finish",
-            "description": (
-                "End the task with the final answer. For a general policy question, leave "
-                "`decision` and `payout` unset. For a claim triage, call this only after "
-                "compute_payout and report exactly the numbers compute_payout returned - do "
-                "not recompute or round the payout yourself, and still write a prose `answer` "
-                "restating the decision. Keep `answer` to two or three sentences."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "answer": {
-                        "type": "string",
-                        "description": (
-                            "The final answer, citing sources by file name and heading. "
-                            "PLAIN TEXT ONLY - no markdown, no bold, no bullet points, no "
-                            "line breaks, so the answer stays valid as one JSON string."
-                        ),
-                    },
-                    "decision": {
-                        "type": "string",
-                        "enum": CLAIM_STATUSES,
-                        "description": "Only for a claim triage: the final coverage decision. Leave unset for a general policy question.",
-                    },
-                    "payout": {
-                        "type": "number",
-                        "description": "Only for a claim triage: the final payout amount, exactly as compute_payout returned it. Leave unset for a general policy question.",
-                    },
-                    "sources": {"type": "array", "items": {"type": "string"}, "description": "File names actually used."},
-                },
-                "required": ["answer"],
-            },
-        },
-    },
-]
-
-_SCHEMA_BY_NAME = {schema["function"]["name"]: schema for schema in TOOL_SCHEMAS}
-
-# The tool subsets ClaimAgent actually sends per call, picked by
-# CLAIM_ID_PATTERN - not the full TOOL_SCHEMAS every time. `finish` is
-# unified across both (see its description above), so it's in both subsets.
-QUESTION_TOOL_SCHEMAS = [_SCHEMA_BY_NAME[name] for name in ("search_policy", "list_documents", "finish")]
-
-TRIAGE_TOOL_SCHEMAS = [
-    _SCHEMA_BY_NAME[name] for name in (
-        "get_claim", "search_policy", "compute_payout", "check_settlement_authority",
-        "flag_for_review", "finish",
-    )
-]
+# Week 9: these six functions' JSON schemas used to be hand-written here
+# (a manual TOOL_SCHEMAS list) and sent to Groq directly. Now they are
+# generated by FastMCP, from the typed wrapper functions in
+# mcp_servers/claims_system_server.py, and ClaimAgent discovers them at
+# runtime over MCP (app/services/mcp_client.py) instead of importing a
+# static list - see agent_service.py's `_tools_for`. `finish` is not a
+# claims-system capability - it is this agent's own loop-control signal -
+# so it stays local, defined in agent_service.py, never exposed over MCP.

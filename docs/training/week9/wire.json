@@ -1,0 +1,91 @@
+{
+  "_readme": "Raw JSON-RPC 2.0 exchange captured live against server two (claims-status-platform, the server Task Set D adds via config only), over its streamable-HTTP transport at http://127.0.0.1:8101/mcp. Captured with plain httpx.post calls - not fastmcp's own Client - specifically to see the actual bytes on the wire, not a friendly Python object. Every response's transport-level framing is 'event: message\\ndata: <json>' because streamable-HTTP always wraps responses as one Server-Sent-Event, even for a single request/response pair, so the same connection can later carry a stream of several messages if the server chooses to.",
+
+  "model_call_location": "The model call happens in exactly one place in this whole exchange: nowhere here. Every message below is either this script (the MCP client) or claims_status_server.py (the MCP server) - no Groq/LLM call occurs on either side of this exchange. The model only exists in ClaimAgent (app/services/agent_service.py), the HOST, which is a separate process from this server and never touches this wire protocol directly - it goes through app/services/mcp_client.py's MCPToolRegistry, which is what actually sends messages shaped like these.",
+
+  "exchange_1_initialize": {
+    "purpose": "The client announces its protocol version and identity; the server responds with its own protocol version, capabilities, and identity. This is a capability handshake, not a tool call.",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {},
+        "clientInfo": {"name": "wire-capture-script", "version": "0.1"}
+      }
+    },
+    "request_annotations": {
+      "jsonrpc": "The JSON-RPC 2.0 version marker - required on every message, request or response.",
+      "id": "A client-chosen correlation id. The server must echo it back on the matching response, so a client sending several requests over one connection can tell which response answers which request.",
+      "method": "The RPC method name - MCP defines a fixed vocabulary (initialize, tools/list, tools/call, ...); this is not a free-form tool name yet, that comes later in tools/call's params.",
+      "params.protocolVersion": "The MCP spec version this client speaks. The server can refuse or downgrade if it doesn't support it - this exchange used 2025-06-18 and the server accepted it unchanged (see response).",
+      "params.capabilities": "Optional client-side feature flags (e.g. can the client handle server-initiated sampling requests). Empty here - this script is a bare capture tool, not a full client.",
+      "params.clientInfo": "Free-text identity for logging/debugging on the server side - not used for authorization."
+    },
+    "response_transport_headers": {
+      "content-type": "text/event-stream",
+      "mcp-session-id": "406edf7e90a24068b4d747bf03a78953"
+    },
+    "response_transport_headers_annotations": {
+      "content-type": "Confirms SSE framing, not a bare JSON body - explains the 'event: message\\ndata: ...' wrapper below.",
+      "mcp-session-id": "Minted by the server on this exchange only. Every subsequent request in this same logical session must echo it back as a header, or the server has no way to associate the stateless HTTP POSTs with one ongoing conversation."
+    },
+    "response_raw": "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"experimental\":{},\"prompts\":{\"listChanged\":true},\"resources\":{\"subscribe\":false,\"listChanged\":true},\"tools\":{\"listChanged\":true},\"tasks\":{\"list\":{},\"cancel\":{},\"requests\":{\"tools\":{\"call\":{}},\"prompts\":{\"get\":{}},\"resources\":{\"read\":{}}}}},\"serverInfo\":{\"name\":\"claims-status-platform\",\"version\":\"2.14.7\"},\"instructions\":\"Claim status and adjuster note history, by claim number, from the claims platform. Deterministic lookup only - no model runs on this server. For policy coverage rules, payout arithmetic, settlement authority or escalation, see the separate claims-system server.\"}}\n",
+    "response_body_annotations": {
+      "jsonrpc": "Same version marker, on every message in both directions.",
+      "id": "Echoes the request's id=1 - proves this response answers that specific request.",
+      "result.protocolVersion": "The server confirms it can speak the version the client asked for (both said 2025-06-18 here - a real mismatch would need negotiation, out of scope for this exchange).",
+      "result.capabilities": "What this server supports as a protocol matter - tools with listChanged notifications, resources, prompts, tasks. This is protocol machinery, not this server's actual claims tools (those only appear in tools/list, next).",
+      "result.serverInfo": "Identifies the server as 'claims-status-platform' - this is how a client could tell, at the protocol level, that it just connected to a DIFFERENT server than claims-system (server one), without any app-specific config.",
+      "result.instructions": "Free-text guidance FastMCP surfaces from this file's own FastMCP(instructions=...) - meant for a model/human deciding when to use this server at all, distinct from any one tool's own docstring."
+    }
+  },
+
+  "exchange_2_notification_initialized": {
+    "purpose": "A one-way notification (no id, no response expected) telling the server the client has finished processing the initialize response and the session is now live. Required by the MCP spec before any other request.",
+    "request": {"jsonrpc": "2.0", "method": "notifications/initialized"},
+    "request_annotations": {
+      "jsonrpc": "Same marker, still present even though this carries no id.",
+      "method": "No 'id' field at all - this is what makes it a notification rather than a request. The server must not send a JSON-RPC response to it (and didn't - see below)."
+    },
+    "response_transport": "HTTP 202 Accepted, empty body - the correct response to a notification: acknowledgement at the transport level, never a JSON-RPC response at the protocol level."
+  },
+
+  "exchange_3_tools_list": {
+    "purpose": "Ask the server to enumerate every tool it currently exposes, with each tool's real, model-facing schema - this is 'discovery,' the mechanism the whole task is about.",
+    "request": {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+    "request_annotations": {
+      "id": "A new id (2) - independent counter from the client, not tied to the session id.",
+      "method": "tools/list - the discovery call. Nothing here names a specific tool; the server decides what to return.",
+      "params": "Empty - tools/list takes no required parameters in this exchange (the spec allows an optional pagination cursor, unused here since this server only has one tool)."
+    },
+    "response_raw": "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"get_claim\",\"description\":\"Retrieve the case file for ONE claim by its claim ID: claimed amount,\\npolicy form and endorsements attached, and the adjuster's notes\\ndescribing what happened. The only tool that returns claim-specific\\nfacts - never policy wording, exclusions or deductible amounts.\\n\\nClaim IDs look like CLM-YYYY-nnnnn (e.g. CLM-2001). If this returns\\n\\\"claim ... not found\\\", that almost always means the ID doesn't match\\nthat shape, not that the claims platform is down - check the ID\\nagainst the pattern and confirm it with the user before answering\\nanything about coverage or payout with no claim actually loaded.\",\"inputSchema\":{\"properties\":{\"claim_id\":{\"type\":\"string\"}},\"required\":[\"claim_id\"],\"type\":\"object\"},\"outputSchema\":{\"additionalProperties\":true,\"type\":\"object\"},\"_meta\":{\"_fastmcp\":{\"tags\":[]}}}]}}\n",
+    "response_body_annotations": {
+      "result.tools": "An array with exactly one entry - proving this server (server two) exposes only get_claim, unlike server one's five.",
+      "result.tools[0].name": "The literal string the model must use in a later tools/call - this is the ONLY place 'get_claim' as a callable name is defined; nothing in agent_service.py names it.",
+      "result.tools[0].description": "FastMCP's generated tool description, taken verbatim from get_claim's Python docstring in claims_status_server.py - this is the Task Set D docstring-as-prompt rewrite: it now tells the model what a not-found error means and what to do about it, not just what the tool returns.",
+      "result.tools[0].inputSchema": "JSON Schema for the arguments a tools/call must supply - generated from the function's type hint (claim_id: str), not hand-written.",
+      "result.tools[0].outputSchema": "A loose schema (any object) for what the tool returns - FastMCP doesn't try to constrain agent_tools.py's own {'result': ...}/{'error': ...} shape more tightly than that.",
+      "result.tools[0]._meta": "FastMCP-internal bookkeeping (tags for filtering, unused here) - not part of the core MCP spec's tool shape."
+    }
+  },
+
+  "exchange_4_tools_call": {
+    "purpose": "Actually invoke get_claim with a real claim id - the moment a capability, not just its description, crosses the wire.",
+    "request": {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "get_claim", "arguments": {"claim_id": "CLM-2001"}}},
+    "request_annotations": {
+      "id": "Third independent request id (3).",
+      "method": "tools/call - the one method that actually executes something server-side. Everything before this was capability negotiation and discovery.",
+      "params.name": "Must be a name tools/list actually returned - 'get_claim' here, matching exchange_3 exactly.",
+      "params.arguments": "The tool's real input, validated server-side against the inputSchema exchange_3 returned - claim_id: 'CLM-2001'."
+    },
+    "response_raw": "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"result\\\":{\\\"claim_id\\\":\\\"CLM-2001\\\",\\\"claimed_amount\\\":6000,\\\"policy_form\\\":\\\"HO-3-2026 + HO-2026-01 (water backup)\\\",\\\"adjuster_notes\\\":\\\"Heavy rain overnight. Basement floor drain backed up and flooded the basement with wastewater. The basement is unfinished, used only for storage and utilities - never finished as living space. Sump pump was inspected the same day and found in proper working order, no mechanical failure. No creek, river or other body of water near the property overflowed.\\\"}}\"}],\"structuredContent\":{\"result\":{\"claim_id\":\"CLM-2001\",\"claimed_amount\":6000,\"policy_form\":\"HO-3-2026 + HO-2026-01 (water backup)\",\"adjuster_notes\":\"Heavy rain overnight. Basement floor drain backed up and flooded the basement with wastewater. The basement is unfinished, used only for storage and utilities - never finished as living space. Sump pump was inspected the same day and found in proper working order, no mechanical failure. No creek, river or other body of water near the property overflowed.\\\"}},\"isError\":false}}\n",
+    "response_body_annotations": {
+      "result.content": "The MCP-spec-standard shape: a list of content blocks (here, one text block) meant for a model to read directly as conversation content - this is what an LLM actually sees.",
+      "result.content[0].text": "A JSON-encoded STRING (note the escaped quotes) containing agent_tools.get_claim's real return value, {'result': {...real claim data...}} - this is genuine, unfabricated data from evaluation/triage_claims.json, not a mock.",
+      "result.structuredContent": "The same payload again, but as real nested JSON rather than a text blob - added so a client that wants to parse the result programmatically (like MCPToolClient.call_tool, which reads result.data) doesn't have to re-parse a string.",
+      "result.isError": "false - this specific call succeeded. Had claim_id been invalid, agent_tools.get_claim would still return isError: false with a {'error': '...'} payload inside content/structuredContent (a recoverable, tool-level failure, not a protocol-level one) - see error_before_after.md for exactly that case."
+    }
+  }
+}
