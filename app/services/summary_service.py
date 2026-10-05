@@ -41,6 +41,11 @@ MAX_TOKENS = 1600
 # visible answer. Dropped automatically if the configured model rejects it.
 REASONING_EFFORT = "low"
 
+# Week 10 Task Set D: matches agent_service.py's own assumption, so a
+# single-agent-vs-squad token/cost comparison is computed the same way on
+# both sides, not two different blended-rate guesses.
+ASSUMED_COST_PER_MILLION_TOKENS = 0.20
+
 UNSETTLED = "not established in the policy sources"
 
 SYSTEM_PROMPT = f"""
@@ -120,7 +125,7 @@ class SummaryService:
         )
 
         started = time.perf_counter()
-        raw_output = self._call(prompt)
+        raw_output, tokens_used = self._call(prompt)
         latency_ms = int((time.perf_counter() - started) * 1000)
 
         summary = raw_output.strip()
@@ -150,13 +155,17 @@ class SummaryService:
                 "reasoning_effort": REASONING_EFFORT if self._reasoning_supported else None,
             },
             "latency_ms": latency_ms,
+            "tokens_used": tokens_used,
+            "cost_usd": round(tokens_used / 1_000_000 * ASSUMED_COST_PER_MILLION_TOKENS, 6),
         }
 
-    def _call(self, prompt: str, attempts: int = 3) -> str:
+    def _call(self, prompt: str, attempts: int = 3) -> tuple[str, int]:
         """
         One Groq call, retrying on the free tier's per-minute token limit
         rather than losing the case. `reasoning_effort` is dropped for the
         life of the process if the configured model does not accept it.
+        Returns (text, total_tokens) - Week 10 needs a real cost number for
+        the single-agent arm of the squad-vs-single race.
         """
 
         messages = [
@@ -182,7 +191,8 @@ class SummaryService:
                     messages=messages,
                     **extra,
                 )
-                return response.choices[0].message.content or ""
+                tokens = response.usage.total_tokens if response.usage else 0
+                return response.choices[0].message.content or "", tokens
 
             except GroqError as error:
                 last_error = error

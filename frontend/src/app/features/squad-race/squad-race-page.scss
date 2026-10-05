@@ -1,0 +1,93 @@
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.progress__bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.case-table,
+.metric-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+}
+
+.cell {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.cell--pass {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.cell--fail {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.cell--review {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.cell--pending {
+  background: var(--bg-muted);
+  color: var(--text-faint);
+}
+
+.trace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+
+  h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+}
+
+.handoff-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+}
