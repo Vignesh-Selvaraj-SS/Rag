@@ -38,6 +38,38 @@ class Settings(BaseSettings):
     FRONTEND_DIST: Path = PROJECT_ROOT / "frontend" / "dist" / "rag-assistant" / "browser"
     LOG_LEVEL: str = "INFO"
 
+    # --- MCP (Week 9) ---------------------------------------------------------
+    # The claims-system MCP server (mcp_servers/claims_system_server.py) runs
+    # as its own standalone process, independent of this FastAPI app - a
+    # separate port so it never collides with uvicorn's default :8000.
+    # MCP_SERVER_URL is what that server's own __main__ block binds to; kept
+    # for that and for tests, but the AGENT no longer reads it directly (see
+    # MCP_CONFIG_PATH below) - Task Set D's whole point is that the agent's
+    # server list comes from config, not a setting agent_service.py imports.
+    MCP_SERVER_HOST: str = "127.0.0.1"
+    MCP_SERVER_PORT: int = 8100
+    MCP_SERVER_URL: str = "http://127.0.0.1:8100/mcp"
+
+    # Week 9 Task Set D "server two": a genuinely separate process
+    # (mcp_servers/claims_status_server.py), its own port so it can run
+    # alongside claims_system_server.py.
+    CLAIMS_STATUS_SERVER_PORT: int = 8101
+
+    # The list of MCP servers ClaimAgent connects to (app/services/mcp_client.py's
+    # MCPToolRegistry) - a JSON file, not a setting, specifically so "add a
+    # server" is a config-file edit with zero lines changed in agent_service.py
+    # or this settings class. See mcp_config.json and agent_diff.txt.
+    MCP_CONFIG_PATH: Path = PROJECT_ROOT / "mcp_config.json"
+
+    # The claims-system server's search_policy tool proxies to this app's
+    # own retrieval endpoint (POST /api/v1/search) rather than opening its
+    # own embedded-Qdrant client - Qdrant's local mode locks its storage
+    # folder to one process, and this app already legitimately needs it for
+    # Chat/Documents/Evaluation. Two processes both trying to open it
+    # directly is a real, reproduced conflict, not a hypothetical one - see
+    # mcp_servers/http_retriever_proxy.py.
+    MAIN_APP_URL: str = "http://127.0.0.1:8000"
+
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         extra="ignore",

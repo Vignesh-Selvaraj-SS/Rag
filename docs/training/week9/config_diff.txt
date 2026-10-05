@@ -1,0 +1,10 @@
+--- .runtime/week9/mcp_config_before.json	2026-09-28 15:54:59.435426000 +0530
++++ mcp_config.json	2026-09-28 15:55:51.728811100 +0530
+@@ -1,5 +1,6 @@
+ {
+   "servers": [
+-    {"name": "claims-system", "url": "http://127.0.0.1:8100/mcp"}
++    {"name": "claims-system", "url": "http://127.0.0.1:8100/mcp"},
++    {"name": "claims-status-platform", "url": "http://127.0.0.1:8101/mcp"}
+   ]
+ }

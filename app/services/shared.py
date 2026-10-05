@@ -80,7 +80,11 @@ def get_eval_service() -> EvalService:
 
 @lru_cache(maxsize=1)
 def get_agent() -> ClaimAgent:
-    return ClaimAgent(retriever=get_rag_service().retriever)
+    # Week 9: no retriever here anymore - ClaimAgent talks to the
+    # claims-system MCP server for every tool, including search_policy,
+    # which holds its own RetrievalService (see
+    # mcp_servers/claims_system_server.py).
+    return ClaimAgent()
 
 
 @lru_cache(maxsize=1)

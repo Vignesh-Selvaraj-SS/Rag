@@ -17,7 +17,6 @@ from groq import GroqError
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
 from app.services.agent_service import ClaimAgent
 from app.services.agent_tools import (
-    TOOL_SCHEMAS,
     check_settlement_authority,
     compute_payout,
     flag_for_review,
@@ -26,6 +25,7 @@ from app.services.agent_tools import (
     search_policy,
 )
 from app.services.fixed_claim_workflow import FixedClaimWorkflow
+from mcp_servers.claims_system_server import search_policy as search_policy_mcp_tool
 
 # ------------------------------------------------------------------- fakes
 
@@ -127,6 +127,58 @@ class _FakeRetriever:
         return {"question": question, "hits": hits, "best_score": best, "passes_gate": bool(hits), "min_score": 0.6}
 
 
+class _FakeMCPToolClient:
+    """
+    Test double for MCPToolClient (app/services/mcp_client.py): dispatches
+    to the real agent_tools.py functions in-process, skipping the actual
+    MCP wire protocol entirely - the same trade _FakeGroqClient makes for
+    the Groq API, so tests stay fast and hermetic while still exercising
+    real business logic, not a reimplementation of it.
+
+    `extra_tool_names` simulates the claims-system MCP server exposing a
+    brand-new tool the fake doesn't know how to execute - used to prove
+    ClaimAgent's triage tool list is genuinely built from discovery, not a
+    hard-coded name set (see _tools_for in agent_service.py).
+    """
+
+    _KNOWN_NAMES = (
+        "search_policy", "list_documents", "get_claim",
+        "compute_payout", "check_settlement_authority", "flag_for_review",
+    )
+
+    def __init__(self, retriever=None, extra_tool_names: tuple[str, ...] = ()):
+        self.retriever = retriever or _FakeRetriever()
+        self.extra_tool_names = extra_tool_names
+        self.calls: list[tuple[str, dict]] = []
+
+    def list_tool_schemas(self) -> list[dict]:
+        names = self._KNOWN_NAMES + self.extra_tool_names
+        return [
+            {"type": "function", "function": {"name": name, "description": f"fake schema for {name}", "parameters": {"type": "object", "properties": {}}}}
+            for name in names
+        ]
+
+    def call_tool(self, name: str, args: dict) -> dict:
+        self.calls.append((name, args))
+        if name == "search_policy":
+            return search_policy(self.retriever, args)
+        if name == "list_documents":
+            return list_documents(args)
+        if name == "get_claim":
+            return get_claim(args)
+        if name == "compute_payout":
+            return compute_payout(args)
+        if name == "check_settlement_authority":
+            return check_settlement_authority(args)
+        if name == "flag_for_review":
+            return flag_for_review(args)
+        # Matches the real MCPToolClient's behaviour calling a name the
+        # server doesn't recognize (see mcp_client.py) - used by
+        # extra_tool_names to prove discovery works, not execution of a
+        # tool the fake was never told how to run.
+        return {"error": f"Unknown tool {name!r}."}
+
+
 def tool_call_message(name, args=None, call_id="call_1"):
     """A model turn that calls exactly one tool - the normal case."""
     return _FakeMessage(content="", tool_calls=[_FakeToolCall(call_id, name, args or {})])
@@ -200,8 +252,11 @@ def test_search_policy_schema_does_not_invite_settlement_authority_checks():
     # "settlement authority payout 5500" instead of using the dedicated
     # tool - a wasted step that helped exhaust the token budget before the
     # run could reach `finish`.
-    schema = next(s for s in TOOL_SCHEMAS if s["function"]["name"] == "search_policy")
-    description = schema["function"]["description"].lower()
+    #
+    # Week 9: this description now lives on the MCP server's tool function
+    # (mcp_servers/claims_system_server.py), not a hand-written schema dict -
+    # FastMCP derives what the model sees straight from this docstring.
+    description = (search_policy_mcp_tool.description or "").lower()
 
     assert "settlement authority" not in description or "never use this to check" in description
     assert "check_settlement_authority" in description
@@ -245,11 +300,16 @@ def test_get_claim_returns_the_case_file():
     assert "expected" not in result["result"]  # the answer key never reaches the model
 
 
-def test_get_claim_unknown_id_is_a_logged_error_not_a_crash():
+def test_get_claim_unknown_id_is_a_recoverable_error_not_a_crash():
 
+    # Week 9 Task Set D: the error names what was tried and the expected
+    # format, so the model can tell a typo apart from a dead claims system
+    # instead of falling back to "Error: lookup failed" - see
+    # docs/training/week9/error_before_after.md.
     result = get_claim({"claim_id": "CLM-9999"})
 
-    assert result["error"].startswith("No claim found")
+    assert "CLM-9999" in result["error"]
+    assert "CLM-YYYY-nnnnn" in result["error"]
 
 
 def test_compute_payout_subtracts_the_excess_when_approved():
@@ -299,27 +359,51 @@ def test_agent_sends_only_question_tools_for_a_policy_question():
         tool_call_message("finish", {"answer": "done", "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     agent.run("What is the deductible for a water backup claim?")
 
     sent_names = {schema["function"]["name"] for schema in client.chat.completions.tools_sent[0]}
     assert sent_names == {"search_policy", "list_documents", "finish"}
 
 
-def test_agent_sends_only_triage_tools_for_a_claim_id():
+def test_agent_sends_every_discovered_tool_for_a_claim_id():
 
+    # Week 9: triage no longer filters by a hard-coded name set - it sends
+    # every tool the claims-system MCP server discovers (see _tools_for),
+    # plus the local `finish`. list_documents is included now (a small,
+    # deliberate behaviour change from the pre-MCP design, which excluded
+    # it) precisely so a genuinely new tool added to the server needs no
+    # change here either - see the discovery test right below.
     client = _FakeGroqClient([
         tool_call_message("compute_payout", {"claimed_amount": 6000, "excess_amount": 500, "claim_status": "approved"}),
         tool_call_message("finish", {"answer": "done", "decision": "approved", "payout": 5500, "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     agent.run("CLM-2001")
 
     sent_names = {schema["function"]["name"] for schema in client.chat.completions.tools_sent[0]}
     assert "get_claim" in sent_names
     assert "compute_payout" in sent_names
-    assert "list_documents" not in sent_names  # not a triage tool - shouldn't be sent
+    assert "list_documents" in sent_names
+    assert "finish" in sent_names
+
+
+def test_triage_tools_include_a_brand_new_mcp_tool_with_no_code_change():
+
+    # The literal Week 9 mentor check: "can they add a second tool without
+    # changing the agent's code?" - simulated here by an MCP server that
+    # discovers one extra tool ClaimAgent has never heard of. No change to
+    # agent_service.py is needed for it to show up in the triage tool list.
+    client = _FakeGroqClient([
+        tool_call_message("finish", {"answer": "done", "sources": []}),
+    ])
+
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient(extra_tool_names=("check_vendor_network",)))
+    agent.run("CLM-2001")
+
+    sent_names = {schema["function"]["name"] for schema in client.chat.completions.tools_sent[0]}
+    assert "check_vendor_network" in sent_names
 
 
 # ------------------------------------------------------- agent: policy question
@@ -331,7 +415,7 @@ def test_agent_finishes_after_one_search_for_a_simple_question():
         tool_call_message("finish", {"answer": "The deductible is $500.", "sources": ["endorsement-HO-2026-01-water-backup.md"]}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("What is the deductible for a water backup claim?")
 
     assert result["finished"] is True
@@ -352,7 +436,7 @@ def test_agent_can_use_list_documents_before_a_targeted_search():
         tool_call_message("finish", {"answer": "Deductible $500, subrogation per the endorsement.", "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("Compound question needing two lookups")
 
     assert result["step_count"] == 3
@@ -363,7 +447,7 @@ def test_agent_treats_a_plain_text_reply_as_an_implicit_finish():
 
     client = _FakeGroqClient([plain_text_message("The deductible is $500, no tool needed.")])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("What is the deductible?")
 
     assert result["finished"] is True
@@ -382,7 +466,7 @@ def test_agent_only_acts_on_the_first_tool_call_when_the_model_offers_several():
         tool_call_message("finish", {"answer": "done", "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x")
 
     assert result["steps"][0]["tool"] == "search_policy"
@@ -396,7 +480,7 @@ def test_agent_handles_an_unknown_tool_name_as_a_logged_error_not_a_crash():
         tool_call_message("finish", {"answer": "Recovered.", "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x")
 
     assert result["steps"][0]["result"]["error"].startswith("Unknown tool")
@@ -405,7 +489,7 @@ def test_agent_handles_an_unknown_tool_name_as_a_logged_error_not_a_crash():
 
 def test_agent_raises_when_no_api_key_configured():
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=None)
+    agent = ClaimAgent(client=None, mcp_client=_FakeMCPToolClient())
 
     with pytest.raises(LLMNotConfiguredError):
         agent.run("x")
@@ -426,7 +510,7 @@ def test_agent_triages_a_claim_calling_get_claim_search_and_compute_payout():
         }),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("CLM-2001")
 
     assert result["finished"] is True
@@ -450,7 +534,7 @@ def test_agent_can_use_a_further_triage_tool_before_finishing():
         }),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("CLM-2007")
 
     assert result["finished"] is True
@@ -475,7 +559,7 @@ def test_agent_rejects_a_finish_call_that_skips_compute_payout():
         tool_call_message("finish", {"answer": "Denied.", "decision": "denied", "payout": 0, "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("CLM-2003")
 
     assert result["finished"] is True
@@ -502,7 +586,7 @@ def test_finish_rejection_message_forbids_extra_tool_calls_before_retrying():
         tool_call_message("finish", {"answer": "Denied.", "decision": "denied", "payout": 0, "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     agent.run("CLM-2003")
 
     last_call_messages = client.chat.completions.calls[-1]
@@ -520,7 +604,7 @@ def test_agent_flag_for_review_ends_the_run_as_escalated_not_decided():
         tool_call_message("flag_for_review", {"claim_id": "CLM-2001", "reason": "notes contradict the policy form on file"}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("CLM-2001")
 
     assert result["decision"] == "escalated"
@@ -546,7 +630,7 @@ def test_agent_enforces_the_iteration_limit():
 
     client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10)
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x", max_iterations=3)
 
     assert result["stopped_reason"] == "iteration_limit"
@@ -558,7 +642,7 @@ def test_agent_enforces_the_token_limit():
 
     client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10, tokens_each=400)
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x", max_iterations=10, max_tokens=900)
 
     assert result["stopped_reason"] == "token_limit"
@@ -572,7 +656,7 @@ def test_agent_enforces_the_cost_limit():
     # iteration or token budgets would.
     client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10, tokens_each=400)
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x", max_iterations=10, max_tokens=100000, max_cost_usd=0.00015)
 
     assert result["stopped_reason"] == "cost_limit"
@@ -583,7 +667,7 @@ def test_agent_enforces_the_wall_clock_budget():
 
     client = _FakeGroqClient([tool_call_message("search_policy", {"query": "x"})] * 10)
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x", max_iterations=10, max_seconds=0.0)
 
     assert result["stopped_reason"] == "time_limit"
@@ -602,7 +686,7 @@ def test_agent_retries_after_a_malformed_tool_call_response():
         tool_call_message("finish", {"answer": "Recovered after two retries.", "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x")
 
     assert result["finished"] is True
@@ -623,7 +707,7 @@ def test_agent_survives_repeated_output_parse_failures():
         tool_call_message("finish", {"answer": "Recovered.", "decision": "approved", "payout": 8000, "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("CLM-2010")
 
     assert result["finished"] is True
@@ -634,7 +718,7 @@ def test_agent_does_not_retry_an_unrelated_error():
 
     client = _FakeGroqClient([GroqError("internal server error")])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
 
     with pytest.raises(LLMUpstreamError):
         agent.run("x")
@@ -656,7 +740,7 @@ def test_agent_retries_after_a_rate_limit_error(monkeypatch):
         tool_call_message("finish", {"answer": "Recovered after a rate limit wait.", "sources": []}),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
     result = agent.run("x")
 
     assert result["finished"] is True
@@ -670,7 +754,7 @@ def test_agent_gives_up_after_exhausting_rate_limit_retries(monkeypatch):
 
     client = _FakeGroqClient([GroqError("rate limit exceeded")] * 5)  # RATE_LIMIT_RETRIES + 1
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
 
     with pytest.raises(LLMUpstreamError):
         agent.run("x")
@@ -689,7 +773,7 @@ def test_agent_attaches_steps_so_far_to_a_hard_failure():
         GroqError("internal server error"),
     ])
 
-    agent = ClaimAgent(retriever=_FakeRetriever(), client=client)
+    agent = ClaimAgent(client=client, mcp_client=_FakeMCPToolClient())
 
     with pytest.raises(LLMUpstreamError) as excinfo:
         agent.run("CLM-2001")

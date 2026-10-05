@@ -31,6 +31,16 @@ the way it is actually built.
 Every run returns the full list of steps, never just the final answer - the
 Week 7 mentor check is "are the steps visible," and a result object with no
 step log fails that regardless of what the final answer says.
+
+Week 9: this agent's tools are no longer wired in by hand. Every tool
+except `finish` (the agent's own loop-control signal, never a claims-system
+capability - see FINISH_SCHEMA) is discovered at the start of every run()
+call from the claims-system MCP server (mcp_servers/claims_system_server.py)
+over app/services/mcp_client.py, and every tool call is dispatched
+generically through that same client - see _tools_for and _call_tool. The
+host (this process, running the LLM) never runs on the tool server; the
+server only ever executes deterministic lookups/arithmetic, the same
+functions this file used to import and call directly.
 """
 
 import json
@@ -41,20 +51,9 @@ from groq import Groq, GroqError
 
 from app.core.config import settings
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
-from app.services.agent_tools import (
-    CLAIM_ID_PATTERN,
-    CLAIM_STATUSES,
-    QUESTION_TOOL_SCHEMAS,
-    TRIAGE_TOOL_SCHEMAS,
-    check_settlement_authority,
-    compute_payout,
-    flag_for_review,
-    get_claim,
-    list_documents,
-    search_policy,
-)
+from app.services.agent_tools import CLAIM_ID_PATTERN, CLAIM_STATUSES
 from app.services.groq_retry import create_completion_with_retry
-from app.services.retrieval_service import RetrievalService
+from app.services.mcp_client import MCPToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +115,61 @@ DEFAULT_MAX_SECONDS = 180.0
 # jobs apart once given get_claim, it just paid for both jobs' instructions
 # and tools on every call it made either way.
 
+# Week 9: the tool SCHEMAS themselves now come from live MCP discovery
+# (self.mcp_client.list_tool_schemas(), in _tools_for below) instead of a
+# hard-coded dict - but a general policy question still shouldn't be
+# offered get_claim/compute_payout/etc., which is a business-scoping
+# decision, not "hard-coding a tool." Triage gets every tool the
+# claims-system MCP server discovers, unfiltered - the literal "add a
+# second tool without touching the agent's code" property: a new
+# @mcp.tool function added to mcp_servers/claims_system_server.py shows up
+# here on the very next call, with zero edits to this file.
+QUESTION_TOOL_NAMES = {"search_policy", "list_documents"}
+
+# `finish` is not a claims-system capability - it is this agent's own
+# loop-control signal (see run()'s handling of it) - so it is never
+# exposed over MCP, and stays a local, hand-written schema. Unified across
+# both jobs: a pure policy question leaves `decision`/`payout` null; a
+# claim triage fills them in and still writes a prose `answer` restating
+# the decision. One contract, two legitimate shapes of its content.
+FINISH_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "finish",
+        "description": (
+            "End the task with the final answer. For a general policy question, leave "
+            "`decision` and `payout` unset. For a claim triage, call this only after "
+            "compute_payout and report exactly the numbers compute_payout returned - do "
+            "not recompute or round the payout yourself, and still write a prose `answer` "
+            "restating the decision. Keep `answer` to two or three sentences."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string",
+                    "description": (
+                        "The final answer, citing sources by file name and heading. "
+                        "PLAIN TEXT ONLY - no markdown, no bold, no bullet points, no "
+                        "line breaks, so the answer stays valid as one JSON string."
+                    ),
+                },
+                "decision": {
+                    "type": "string",
+                    "enum": CLAIM_STATUSES,
+                    "description": "Only for a claim triage: the final coverage decision. Leave unset for a general policy question.",
+                },
+                "payout": {
+                    "type": "number",
+                    "description": "Only for a claim triage: the final payout amount, exactly as compute_payout returned it. Leave unset for a general policy question.",
+                },
+                "sources": {"type": "array", "items": {"type": "string"}, "description": "File names actually used."},
+            },
+            "required": ["answer"],
+        },
+    },
+}
+
 QUESTION_SYSTEM_PROMPT = """
 You are a claims assistant for Meridian Mutual, answering a general policy
 question from the policy documents alone.
@@ -168,9 +222,8 @@ class AgentStoppedError(Exception):
 class ClaimAgent:
     """Runs the think -> act -> observe loop for one input - a policy question or a claim ID."""
 
-    def __init__(self, retriever: RetrievalService | None = None, client=_UNSET):
+    def __init__(self, client=_UNSET, mcp_client=None):
 
-        self.retriever = retriever or RetrievalService()
         # client=_UNSET (the default) builds the real client from settings;
         # client=None explicitly forces "not configured" - tests need to be
         # able to say that even when a real GROQ_API_KEY is set in .env.
@@ -178,6 +231,12 @@ class ClaimAgent:
             (Groq(api_key=settings.GROQ_API_KEY) if settings.GROQ_API_KEY else None)
             if client is _UNSET else client
         )
+        # Week 9 Task Set D: reads mcp_config.json's server list - not a
+        # single URL - so adding server two is a config-file edit, never a
+        # change here. This line, and everything below it in this file, is
+        # the "server one" baseline agent_diff.txt proves stays byte-for-
+        # byte identical once server two is added.
+        self.mcp_client = mcp_client or MCPToolRegistry()
 
     def run(
         self,
@@ -192,7 +251,7 @@ class ClaimAgent:
             raise LLMNotConfiguredError()
 
         is_triage = bool(CLAIM_ID_PATTERN.match(user_input.strip()))
-        tools = TRIAGE_TOOL_SCHEMAS if is_triage else QUESTION_TOOL_SCHEMAS
+        tools = self._tools_for(is_triage)
         system_prompt = TRIAGE_SYSTEM_PROMPT if is_triage else QUESTION_SYSTEM_PROMPT
 
         started = time.perf_counter()
@@ -395,24 +454,32 @@ class ClaimAgent:
 
         return call.function.name, args, result, message.content or "", tokens, call.id
 
+    def _tools_for(self, is_triage: bool) -> list[dict]:
+        """
+        Discovers the claims-system server's current tool set over MCP -
+        not a hard-coded list - then adds the local `finish` schema. Triage
+        gets every discovered tool unfiltered (see QUESTION_TOOL_NAMES's
+        comment above for why a policy question gets a curated subset
+        instead): this is the actual "add a second tool without touching
+        the agent's code" property, exercised end to end by
+        test_triage_tools_include_a_brand_new_mcp_tool_with_no_code_change.
+        """
+
+        discovered = self.mcp_client.list_tool_schemas()
+
+        if is_triage:
+            tools = discovered
+        else:
+            tools = [schema for schema in discovered if schema["function"]["name"] in QUESTION_TOOL_NAMES]
+
+        return tools + [FINISH_SCHEMA]
+
     def _call_tool(self, tool_name: str, args: dict) -> dict:
+        """
+        Every non-`finish` tool call, generic by construction: whatever
+        name and args the model produced go straight to the MCP server -
+        there is no per-tool branch here to update when a tool is added,
+        renamed or removed on the server side.
+        """
 
-        if tool_name == "search_policy":
-            return search_policy(self.retriever, args)
-
-        if tool_name == "list_documents":
-            return list_documents(args)
-
-        if tool_name == "get_claim":
-            return get_claim(args)
-
-        if tool_name == "compute_payout":
-            return compute_payout(args)
-
-        if tool_name == "check_settlement_authority":
-            return check_settlement_authority(args)
-
-        if tool_name == "flag_for_review":
-            return flag_for_review(args)
-
-        return {"error": f"Unknown tool {tool_name!r}."}
+        return self.mcp_client.call_tool(tool_name, args)
