@@ -14,10 +14,12 @@ from app.services.document_service import DocumentService
 from app.services.eval_service import EvalService
 from app.services.evaluation_service import EvaluationService
 from app.services.agent_service import ClaimAgent
+from app.services.claims_squad_service import ClaimsSquadService
 from app.services.fixed_claim_workflow import FixedClaimWorkflow
 from app.services.index_metadata import IndexMetadata
 from app.services.judge_service import JudgeService
 from app.services.rag_service import RAGService
+from app.services.squad_race_service import SquadRaceService
 from app.services.summary_service import SummaryService
 from app.services.trace_service import TraceService
 
@@ -60,8 +62,26 @@ def get_summary_service() -> SummaryService:
 
 
 @lru_cache(maxsize=1)
+def get_claims_squad_service() -> ClaimsSquadService:
+    return ClaimsSquadService(rag_service=get_rag_service())
+
+
+@lru_cache(maxsize=1)
 def get_judge_service() -> JudgeService:
     return JudgeService()
+
+
+@lru_cache(maxsize=1)
+def get_squad_race_service() -> SquadRaceService:
+    return SquadRaceService(
+        results_path=settings.RUNTIME_DIR / "claims_squad_race" / "results.json",
+        rag_service=get_rag_service(),
+        summary_service=get_summary_service(),
+        squad_service=get_claims_squad_service(),
+        judge_service=get_judge_service(),
+        eval_set_path=settings.eval_set_path,
+        eval_runs_dir=settings.eval_runs_dir,
+    )
 
 
 @lru_cache(maxsize=1)

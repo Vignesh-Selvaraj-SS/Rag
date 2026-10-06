@@ -1,0 +1,38 @@
+# Week 10 Task Set D - handoffs.log
+# Every hand-off the claims squad made, across all 9 M6 cases, with its token count.
+# Format: case_id | from -> to | tokens | note
+
+S1           | manager                        -> summary_worker   |   1260 tok
+S1           | manager                        -> coverage_worker  |      0 tok  | HTTP 500 (simulated) from the coverage/exclusions worker
+S1           | summary_worker+coverage_worker -> manager          |   1328 tok
+S2           | manager                        -> summary_worker   |    671 tok
+S2           | manager                        -> coverage_worker  |   1808 tok
+S2           | summary_worker+coverage_worker -> manager          |   1083 tok
+S3           | manager                        -> summary_worker   |    636 tok
+S3           | manager                        -> coverage_worker  |   2174 tok
+S3           | summary_worker+coverage_worker -> manager          |   1055 tok
+S4           | manager                        -> summary_worker   |    951 tok
+S4           | manager                        -> coverage_worker  |   1671 tok
+S4           | summary_worker+coverage_worker -> manager          |   1045 tok
+R-M6-V01     | manager                        -> summary_worker   |    743 tok
+R-M6-V01     | manager                        -> coverage_worker  |   1779 tok
+R-M6-V01     | summary_worker+coverage_worker -> manager          |   1923 tok
+R-M6-V11     | manager                        -> summary_worker   |    797 tok
+R-M6-V11     | manager                        -> coverage_worker  |   1913 tok
+R-M6-V11     | summary_worker+coverage_worker -> manager          |   1127 tok
+R-M6-V13     | manager                        -> summary_worker   |    922 tok
+R-M6-V13     | manager                        -> coverage_worker  |   2320 tok
+R-M6-V13     | summary_worker+coverage_worker -> manager          |   1372 tok
+R-M6-V17     | manager                        -> summary_worker   |    946 tok
+R-M6-V17     | manager                        -> coverage_worker  |   2095 tok
+R-M6-V17     | summary_worker+coverage_worker -> manager          |   1208 tok
+R-M6-V18     | manager                        -> summary_worker   |    798 tok
+R-M6-V18     | manager                        -> coverage_worker  |   1699 tok
+R-M6-V18     | summary_worker+coverage_worker -> manager          |   1000 tok
+
+# Totals by hand-off, across all 9 cases:
+manager -> coverage_worker                          15459 tok  (45% of all squad tokens)
+summary_worker+coverage_worker -> manager           11141 tok  (32% of all squad tokens)
+manager -> summary_worker                            7724 tok  (23% of all squad tokens)
+
+TOTAL SQUAD TOKENS: 34324

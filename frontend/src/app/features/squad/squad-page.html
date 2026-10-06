@@ -1,0 +1,136 @@
+<div class="page">
+  <app-page-header
+    title="Claims Squad"
+    subtitle="Week 10: a manager plus two specialists (an adjuster-note summary worker and a coverage/exclusions worker) - paste real adjuster notes and watch the three hand-offs that produce the final claim summary."
+  />
+
+  <div class="ask-form">
+    <textarea
+      class="input textarea"
+      rows="5"
+      placeholder="Paste adjuster notes, e.g. Claim CLM-2026-00417, date of loss 2026-03-14. Policyholder reports..."
+      [value]="notes()"
+      (input)="notes.set($any($event.target).value)"
+      (keydown.enter)="onEnter($event)"
+      [disabled]="running()"
+    ></textarea>
+    <div class="row row--between">
+      <div class="samples">
+        @for (sample of samples; track sample) {
+          <button type="button" class="chip" [disabled]="running()" (click)="useSample(sample)">
+            {{ sample.slice(0, 40) }}…
+          </button>
+        }
+      </div>
+      <label class="row small muted" style="gap: 6px; cursor: pointer;">
+        <input
+          type="checkbox"
+          [checked]="simulateFailure()"
+          (change)="simulateFailure.set($any($event.target).checked)"
+          [disabled]="running()"
+        />
+        Simulate coverage-worker failure (Week 10 demo)
+      </label>
+      <button type="button" class="btn btn--primary" [disabled]="running() || !notes().trim()" (click)="run()">
+        {{ running() ? 'Running…' : 'Run' }}
+      </button>
+    </div>
+    <p class="faint small">Enter to run · Shift+Enter for a new line</p>
+  </div>
+
+  @if (runError()) {
+    <app-error-state title="Run could not complete" [error]="runError()" (retry)="retry()" />
+  }
+
+  @if (running()) {
+    <app-loading-indicator message="Manager → summary worker → coverage worker → manager synthesis…" />
+  } @else if (!result()) {
+    <app-empty-state
+      icon="🧑‍🤝‍🧑"
+      title="No run yet"
+      description="Paste adjuster notes above (or pick a sample), optionally simulate the coverage worker failing, and click Run."
+    />
+  } @else if (result(); as r) {
+    @if (r.error) {
+      <div class="notice notice--warning">{{ r.error }}</div>
+    } @else {
+      <section class="trace-card">
+        <div class="row row--between">
+          <span [class]="coverageClass(r.fields['COVERAGE'])">{{ r.fields['COVERAGE'] || '—' }}</span>
+          <span class="payout">{{ r.fields['DEDUCTIBLE'] || '—' }}</span>
+        </div>
+
+        @if (r.worker_error) {
+          <div class="notice notice--warning">
+            Coverage/exclusions worker failed: {{ r.worker_error }} — the manager degraded to a partial
+            answer below rather than retrying or asserting a coverage position it never determined.
+          </div>
+        }
+
+        <dl class="fields">
+          @for (label of fieldOrder; track label) {
+            <div class="field">
+              <dt>{{ label }}</dt>
+              <dd>{{ r.fields[label] || '—' }}</dd>
+            </div>
+          }
+        </dl>
+
+        <div class="grid grid--stats">
+          <div class="stat">
+            <span class="stat__label">Hand-offs</span>
+            <span class="stat__value">{{ r.handoffs.length }}</span>
+            <span class="stat__hint">3 agents</span>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Tokens</span>
+            <span class="stat__value">{{ r.tokens_used }}</span>
+            <span class="stat__hint">${{ r.cost_usd | number: '1.5-5' }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat__label">Latency</span>
+            <span class="stat__value">{{ r.latency_ms }}ms</span>
+            <span class="stat__hint">3 sequential Groq calls</span>
+          </div>
+        </div>
+
+        @if (r.sources.length) {
+          <p class="muted small">Sources: {{ r.sources.join(', ') }}</p>
+        }
+
+        <button type="button" class="btn btn--ghost" (click)="toggleTrace()">
+          {{ showTrace() ? 'Hide' : 'Show' }} how the squad worked
+        </button>
+
+        @if (showTrace()) {
+          <ol class="steps">
+            <li class="step">
+              <div class="step__header">
+                <span class="step__index">1</span>
+                <span class="step__tool">summary_worker</span>
+                <span class="muted small">{{ r.handoffs[0]?.tokens }} tok (manager → summary_worker)</span>
+              </div>
+              <pre class="mono step__block">{{ r.intermediate['summary_worker'] }}</pre>
+            </li>
+            <li class="step">
+              <div class="step__header">
+                <span class="step__index">2</span>
+                <span class="step__tool">coverage_worker</span>
+                <span class="muted small">{{ r.handoffs[1]?.tokens }} tok (manager → coverage_worker)</span>
+              </div>
+              <pre class="mono step__block">{{ r.intermediate['coverage_worker'] }}</pre>
+            </li>
+            <li class="step">
+              <div class="step__header">
+                <span class="step__index">3</span>
+                <span class="step__tool">manager (synthesis)</span>
+                <span class="muted small">{{ r.handoffs[2]?.tokens }} tok (both workers → manager)</span>
+              </div>
+              <pre class="mono step__block step__block--result">{{ r.summary }}</pre>
+            </li>
+          </ol>
+        }
+      </section>
+    }
+  }
+</div>

@@ -1,0 +1,122 @@
+<div class="page">
+  <app-page-header
+    title="Squad Race"
+    subtitle="Week 10: race the claims squad against the single agent (SummaryService) over the same 9 Week 6 M6 claim-summary cases - same judge, same assertions, one injected coverage-worker failure."
+  />
+
+  @if (unreachable()) {
+    <div class="notice notice--danger">Could not reach the API to check race status.</div>
+  }
+
+  @if (status(); as s) {
+    <div class="row row--between">
+      <button type="button" class="btn btn--primary" [disabled]="starting() || s.running" (click)="startRace()">
+        {{ s.running ? 'Running…' : starting() ? 'Starting…' : 'Run race' }}
+      </button>
+      @if (s.running) {
+        <span class="muted small">{{ s.current || 'working…' }}</span>
+      }
+    </div>
+
+    @if (s.error) {
+      <div class="notice notice--warning">Race stopped early: {{ s.error }}</div>
+    }
+
+    @if (s.total_pairs) {
+      <div class="progress">
+        <div class="progress__bar" [style.width.%]="progressPct(s)"></div>
+      </div>
+      <p class="muted small">{{ s.completed_pairs }} / {{ s.total_pairs }} case/arm runs complete</p>
+    }
+
+    @if (s.per_case.length) {
+      <table class="case-table">
+        <thead>
+          <tr>
+            <th>Case</th>
+            <th>Single</th>
+            <th>Squad</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of s.per_case; track c.id) {
+            <tr>
+              <td class="mono">{{ c.id }}</td>
+              <td><span [class]="statusClass(c.single_status)">{{ c.single_status || '—' }}</span></td>
+              <td>
+                <span [class]="statusClass(c.squad_status)">{{ c.squad_status || '—' }}</span>
+                @if (c.fail_injected) {
+                  <span class="muted small"> (failure injected)</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    @if (s.single_summary; as single) {
+      @if (s.squad_summary; as squad) {
+        <section class="trace-card">
+          <h2>Race table</h2>
+          <table class="metric-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Single agent</th>
+                <th>Claims squad</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Pass rate</td>
+                <td>{{ single.pass_rate | percent: '1.0-0' }}</td>
+                <td>{{ squad.pass_rate | percent: '1.0-0' }}</td>
+              </tr>
+              <tr>
+                <td>p50 latency</td>
+                <td>{{ single.p50_latency_ms | number: '1.0-0' }}ms</td>
+                <td>{{ squad.p50_latency_ms | number: '1.0-0' }}ms</td>
+              </tr>
+              <tr>
+                <td>p99 latency</td>
+                <td>{{ single.p99_latency_ms | number: '1.0-0' }}ms</td>
+                <td>{{ squad.p99_latency_ms | number: '1.0-0' }}ms</td>
+              </tr>
+              <tr>
+                <td>Total tokens</td>
+                <td>{{ single.total_tokens }}</td>
+                <td>{{ squad.total_tokens }}</td>
+              </tr>
+              <tr>
+                <td>Cost / claim</td>
+                <td>${{ single.cost_per_claim_usd | number: '1.5-5' }}</td>
+                <td>${{ squad.cost_per_claim_usd | number: '1.5-5' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          @if (s.context_resend_multiplier !== null) {
+            <p class="muted small">
+              Context re-send multiplier (squad tokens / single tokens): <strong>{{ s.context_resend_multiplier }}x</strong>
+            </p>
+          }
+        </section>
+      }
+    }
+
+    @if (s.handoff_totals && sortedHandoffs(s.handoff_totals).length) {
+      <section class="trace-card">
+        <h2>Hand-off token share</h2>
+        <ul class="handoff-list">
+          @for (h of sortedHandoffs(s.handoff_totals); track h.key) {
+            <li>
+              <span class="mono">{{ h.key }}</span>
+              <span class="muted small">{{ h.tokens }} tok ({{ h.pct }}%)</span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</div>

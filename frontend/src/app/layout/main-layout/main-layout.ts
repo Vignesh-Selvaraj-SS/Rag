@@ -17,6 +17,8 @@ const NAV: NavItem[] = [
   { path: '/evaluation', label: 'Evaluation', icon: '🎯' },
   { path: '/analytics', label: 'Analytics', icon: '📈' },
   { path: '/agent', label: 'Agent', icon: '🧭' },
+  { path: '/squad', label: 'Claims Squad', icon: '🧑‍🤝‍🧑' },
+  { path: '/squad-race', label: 'Squad Race', icon: '🏁' },
   { path: '/settings', label: 'Settings', icon: '⚙️' },
   { path: '/developer', label: 'Developer', icon: '🛠️', developer: true },
 ];

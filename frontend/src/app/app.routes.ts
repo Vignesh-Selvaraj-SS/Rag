@@ -33,6 +33,16 @@ export const routes: Routes = [
         loadComponent: () => import('./features/agent/agent-page').then((m) => m.AgentPage),
       },
       {
+        path: 'squad',
+        title: 'Claims Squad · RAG Assistant',
+        loadComponent: () => import('./features/squad/squad-page').then((m) => m.SquadPage),
+      },
+      {
+        path: 'squad-race',
+        title: 'Squad Race · RAG Assistant',
+        loadComponent: () => import('./features/squad-race/squad-race-page').then((m) => m.SquadRacePage),
+      },
+      {
         path: 'settings',
         title: 'Settings · RAG Assistant',
         loadComponent: () => import('./features/settings/settings-page').then((m) => m.SettingsPage),
