@@ -1,0 +1,38 @@
+{
+  "_readme": "The one bad answer found by drill.md, pulled straight from .runtime/claim_log.jsonl (request_id r_3a12a66c8bed). Every field below is the real, redacted log entry - nothing here was hand-typed to look like a bug.",
+  "request_id": "r_3a12a66c8bed",
+  "timestamp": "2026-10-12T14:33:00+00:00",
+  "origin": "single_agent",
+  "input_type": "coverage_question",
+  "prompt_version": "s1",
+  "claim_no": "[CLAIM_NO]",
+  "notes_redacted": "Claim [CLAIM_NO], date of loss 2026-08-20. Policyholder reports water has been seeping into the basement through the floor drain continuously over the past three weeks, gradually soaking the carpet and baseboards. Endorsement HO-2026-01 is attached. What is the coverage position and the deductible?",
+  "fields": {
+    "CLAIM": "[CLAIM_NO]",
+    "DATE OF LOSS": "2026-08-20",
+    "COVERAGE": "covered",
+    "BASIS": "Water backed up through a drain is covered with endorsement HO-2026-01 up to $10,000 (or $25,000 at higher limit) and a $500 deductible [S1].",
+    "DEDUCTIBLE": "$500",
+    "NEXT ACTION": "Adjuster should confirm the loss amount and proceed with claim approval under the endorsement."
+  },
+  "_why_this_is_wrong": "HO-2026-01 (endorsement-HO-2026-01-water-backup.md) covers sudden, one-time water backup - but it excludes loss caused by CONTINUOUS OR REPEATED seepage over a period of more than 14 days. The notes say 'continuously over the past three weeks' - 21 days, over the 14-day line - which is exactly the exclusion condition. The correct COVERAGE line is 'denied', not 'covered'. The model did not misread anything; it was never shown the exclusion text at all (see _diagnosis).",
+  "summary_redacted": "CLAIM: [CLAIM_NO]\nDATE OF LOSS: 2026-08-20\nCOVERAGE: covered\nBASIS: Water backed up through a drain is covered with endorsement HO-2026-01 up to $10,000 (or $25,000 at higher limit) and a $500 deductible [S1].\nDEDUCTIBLE: $500\nNEXT ACTION: Adjuster should confirm the loss amount and proceed with claim approval under the endorsement.",
+  "retrieved_context_ids": [
+    "faq-policyholder-endorsements.md::1",
+    "faq-policyholder-endorsements.md::2",
+    "faq-policyholder-endorsements.md::10",
+    "faq-policyholder-endorsements.md::13",
+    "faq-policyholder-endorsements.md::12"
+  ],
+  "cited_chunk_ids": [
+    "faq-policyholder-endorsements.md::1"
+  ],
+  "_diagnosis": "All 5 retrieved chunks come from faq-policyholder-endorsements.md and nothing else - endorsement-HO-2026-01-water-backup.md, which contains the 14-day continuous-seepage exclusion, was never retrieved at all. This request was made with SummaryService.summarise(..., source='faq-policyholder-endorsements.md'), a real retrieval misconfiguration (scoping search to one document) - the same shape of bug a misconfigured filter or a wrong document-routing rule would cause in production. This is a RETRIEVAL failure, not a model reasoning failure: the model answered entirely correctly given what it was shown; it was simply never shown the one document that mattered. The deterministic A9 check (app/services/eval_assertions.py) exists specifically because the judge grades a summary only against the chunks retrieval handed it, so this exact failure reads as 'grounded' to a judge and would otherwise go uncaught.",
+  "spans": [
+    { "name": "retrieval", "latency_ms": 23, "tokens": 0, "cost_usd": 0.0 },
+    { "name": "generation", "latency_ms": 7744, "tokens": 1258, "cost_usd": 0.000252 }
+  ],
+  "tokens_used": 1258,
+  "cost_usd": 0.000252,
+  "latency_ms": 7744
+}

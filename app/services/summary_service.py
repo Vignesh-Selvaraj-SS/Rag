@@ -16,18 +16,35 @@ the same chunks the chat answers use and nothing new is added to the pipeline.
 """
 
 import logging
+import re
 import time
 
 from groq import Groq, GroqError
 
 from app.core.config import settings
 from app.core.errors import LLMNotConfiguredError, LLMUpstreamError
+from app.services.agent_tools import _resolve_source
 
 logger = logging.getLogger(__name__)
 
-# Bump when SYSTEM_PROMPT or the user prompt below changes, for the same
-# reason llm_service.PROMPT_VERSION exists: a recorded run stays replayable.
-SUMMARY_PROMPT_VERSION = "s1"
+# Bump when SYSTEM_PROMPT, the user prompt below, or retrieval behaviour
+# changes, for the same reason llm_service.PROMPT_VERSION exists: a recorded
+# run stays replayable. s2 (Week 11): SYSTEM_PROMPT's text is unchanged, but
+# summarise() now always fetches a named endorsement's own document even
+# when the primary search missed it (see _ensure_named_endorsements_covered
+# below) - a behaviour change big enough to invalidate a run recorded under
+# s1, so it gets its own version rather than hiding inside s1.
+SUMMARY_PROMPT_VERSION = "s2"
+
+# Matches eval_assertions.py's A9 check on purpose: that check is what
+# proves this fix closes the gap, so both must agree on what "a named
+# endorsement" looks like.
+ENDORSEMENT_CODE = re.compile(r"\bHO-20\d{2}-\d{2}[A-Z]?\b")
+
+# How many chunks to pull from a named endorsement's own document when the
+# primary search missed it entirely. Small on purpose - this is a targeted
+# top-up, not a second full retrieval.
+ENDORSEMENT_TOP_UP_K = 2
 
 TEMPERATURE = 0.0
 
@@ -97,20 +114,26 @@ class SummaryService:
         notes: str,
         top_k: int | None = None,
         mode: str = "hybrid",
+        source: str | None = None,
     ) -> dict:
         """
         Retrieve policy context for the notes, then write the summary.
 
         `mode` defaults to hybrid because adjuster notes carry exact form
         codes such as HO-2026-01, which is where dense retrieval alone is
-        weakest and BM25 keyword matching is strongest.
+        weakest and BM25 keyword matching is strongest. `source` restricts
+        retrieval to one document - normally unset; Week 11's planted
+        failure uses it to reproduce a real misconfiguration (retrieval
+        scoped to the wrong document, so the exclusions text is never seen).
         """
 
         if self.client is None:
             raise LLMNotConfiguredError()
 
-        retrieval = self.rag.search(notes, top_k=top_k, mode=mode)
-        hits = retrieval["hits"]
+        retrieval_started = time.perf_counter()
+        retrieval = self.rag.search(notes, top_k=top_k, mode=mode, source=source)
+        hits, topped_up = self._ensure_named_endorsements_covered(notes, retrieval["hits"], mode)
+        retrieval_latency_ms = int((time.perf_counter() - retrieval_started) * 1000)
 
         sources = "\n\n".join(
             f"[S{number}] file: {hit['source']} | "
@@ -144,6 +167,12 @@ class SummaryService:
             "cited_chunk_ids": [hits[number - 1]["chunk_id"] for number in cited],
             "invalid_citations": invalid,
             "refused": False,
+            # Week 11 fix: which named endorsement codes needed a targeted
+            # top-up fetch because the primary search missed their document.
+            # Empty on almost every real run; non-empty here is a signal
+            # worth watching in production, not just in the eval suite - see
+            # the canary in docs/training/week11/task_set_d.md.
+            "endorsements_topped_up": topped_up,
             "model": settings.MODEL_NAME,
             "summary_prompt_version": SUMMARY_PROMPT_VERSION,
             "citation_parser_version": CITATION_PARSER_VERSION,
@@ -157,7 +186,76 @@ class SummaryService:
             "latency_ms": latency_ms,
             "tokens_used": tokens_used,
             "cost_usd": round(tokens_used / 1_000_000 * ASSUMED_COST_PER_MILLION_TOKENS, 6),
+            # Week 11: per-span breakdown, not just one lump total - retrieval
+            # (fastembed + Qdrant, local, so genuinely $0) and generation (the
+            # one Groq call) are the only two stages this pipeline has; no
+            # tool-calling here, so "tools" is honestly absent, not hidden.
+            "spans": [
+                {"name": "retrieval", "latency_ms": retrieval_latency_ms, "tokens": 0, "cost_usd": 0.0},
+                {"name": "generation", "latency_ms": latency_ms, "tokens": tokens_used,
+                 "cost_usd": round(tokens_used / 1_000_000 * ASSUMED_COST_PER_MILLION_TOKENS, 6)},
+            ],
         }
+
+    def _ensure_named_endorsements_covered(
+        self, notes: str, hits: list[dict], mode: str
+    ) -> tuple[list[dict], list[str]]:
+        """
+        Week 11 retrieval-layer fix for the drill in docs/training/week11/.
+
+        Adjuster notes sometimes name a specific endorsement code (e.g.
+        HO-2026-01). If the primary search above never retrieved so much as
+        one chunk from that endorsement's own document - whether because a
+        `source` scope hid it (the planted failure) or because ranking
+        simply ranked it below top_k (a real risk whenever notes name more
+        than one endorsement) - the model is left to answer from whatever
+        it got, which reads as "grounded" to the judge even when it is
+        wrong (see A9 in eval_assertions.py). Rather than trust ranking to
+        find a document already named by its exact code, resolve the code
+        straight to its real file name (`_resolve_source`, the same lookup
+        agent_tools.py uses for the same reason) and fetch a few chunks
+        from it directly.
+
+        An earlier attempt used a free-text supplementary query like
+        "HO-2026-01 exclusions" instead - a live test showed this reliably
+        returns OTHER endorsements' "Exclusions" sections (the generic word
+        dominates the specific code in ranking), not the named document, so
+        it was dropped in favour of the direct, code-to-filename approach
+        below.
+        """
+
+        codes = sorted(set(ENDORSEMENT_CODE.findall(notes or "")))
+
+        if not codes:
+            return hits, []
+
+        covered_sources = {hit["source"] for hit in hits}
+        topped_up: list[str] = []
+
+        for code in codes:
+
+            if any(code in source for source in covered_sources):
+                continue
+
+            resolved = _resolve_source(code)
+
+            if resolved is None or resolved == code:
+                # Nothing in the corpus matches this code's filename pattern
+                # - not a retrieval bug, just a code the corpus doesn't have.
+                continue
+
+            top_up = self.rag.search(notes, top_k=ENDORSEMENT_TOP_UP_K, mode=mode, source=resolved)
+            new_chunk_ids = {hit["chunk_id"] for hit in hits}
+
+            for hit in top_up["hits"]:
+                if hit["chunk_id"] not in new_chunk_ids:
+                    hits.append(hit)
+                    new_chunk_ids.add(hit["chunk_id"])
+
+            if top_up["hits"]:
+                topped_up.append(code)
+
+        return hits, topped_up
 
     def _call(self, prompt: str, attempts: int = 3) -> tuple[str, int]:
         """

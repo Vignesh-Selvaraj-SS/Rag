@@ -264,12 +264,59 @@ def no_invalid_citations(case: dict, result: dict) -> dict:
     return _result("A8", "A8 no invented citations", checked["status"], checked["detail"])
 
 
+def named_endorsement_retrieved(case: dict, result: dict) -> dict:
+    """
+    A9 (Week 11) - if the notes name a specific endorsement (e.g.
+    HO-2026-01), retrieval must have reached that endorsement's OWN
+    document at least once, not just a general FAQ or a different
+    endorsement. This exists because the judge cannot catch this failure
+    mode by construction - it only ever grades a summary against the
+    chunks retrieval actually handed it, so a confidently wrong "covered"
+    answer built entirely from paraphrased FAQ text reads as perfectly
+    "grounded" to a judge that never sees the endorsement's own exclusions
+    section existed. Only a check that looks at WHICH document was
+    retrieved, not what the summary says about it, can catch this - see
+    docs/training/week11/drill.md.
+    """
+
+    name = "A9 named endorsement document retrieved"
+
+    if case.get("type") != "summary":
+        return _result("A9", name, "skip", "not a claim summary")
+
+    # Endorsement codes only (HO-20YY-NN) - not CLAUSE_ID's CP-NN branch.
+    # Found live while validating this check against real suite data: CP-09
+    # (claims procedure) genuinely lives in claims-adjuster-authority.md,
+    # a filename that doesn't contain "CP-09" at all - flagging that as a
+    # retrieval miss was a false positive from reusing CLAUSE_ID whole, not
+    # a real bug. Endorsement files (endorsement-HO-2026-01-...) DO
+    # consistently embed their own code in the filename, which is the one
+    # property this check actually depends on.
+    codes = sorted(set(re.findall(r"\bHO-20\d{2}-\d{2}[A-Z]?\b", case.get("notes") or "")))
+
+    if not codes:
+        return _result("A9", name, "skip", "notes name no specific endorsement")
+
+    retrieved_sources = {hit.get("source", "") for hit in (result.get("retrieved") or [])}
+    missing = [code for code in codes if not any(code in source for source in retrieved_sources)]
+
+    if missing:
+        return _result(
+            "A9", name, "fail",
+            f"endorsement(s) {', '.join(missing)} named in the notes but never retrieved "
+            f"(retrieved only: {', '.join(sorted(s for s in retrieved_sources if s)) or 'nothing'})",
+        )
+
+    return _result("A9", name, "pass")
+
+
 ANSWER_ASSERTIONS = (
     did_not_refuse,
     must_refuse,
     output_complete,
     citation_present,
     no_invalid_citations,
+    named_endorsement_retrieved,
 )
 
 ASSERTION_COUNT = len(SUMMARY_ASSERTIONS) + len(ANSWER_ASSERTIONS)

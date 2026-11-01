@@ -144,6 +144,81 @@ def test_a4_denial_requires_a_clause_id():
     assert no_denial["status"] == "skip"
 
 
+# ------------------------------------------------------------------------ A9
+
+def test_a9_fails_when_a_named_endorsement_was_never_retrieved():
+
+    case = {
+        "type": "summary",
+        "notes": "Endorsement HO-2026-01 is attached. What is the coverage position?",
+    }
+    result = _summary_result(
+        "COVERAGE: covered\n",
+        retrieved=[{"source": "faq-policyholder-endorsements.md", "chunk_id": "c1"}],
+    )
+
+    checked = eval_assertions.named_endorsement_retrieved(case, result)
+
+    assert checked["status"] == "fail"
+    assert "HO-2026-01" in checked["detail"]
+
+
+def test_a9_passes_when_the_named_endorsement_was_retrieved():
+
+    case = {
+        "type": "summary",
+        "notes": "Endorsement HO-2026-01 is attached. What is the coverage position?",
+    }
+    result = _summary_result(
+        "COVERAGE: denied\n",
+        retrieved=[
+            {"source": "faq-policyholder-endorsements.md", "chunk_id": "c1"},
+            {"source": "endorsement-HO-2026-01-water-backup.md", "chunk_id": "c2"},
+        ],
+    )
+
+    checked = eval_assertions.named_endorsement_retrieved(case, result)
+
+    assert checked["status"] == "pass"
+
+
+def test_a9_ignores_cp_numbered_procedure_references_not_just_endorsements():
+    """
+    Regression test: an earlier version of this check reused CLAUSE_ID whole
+    (HO-20YY-NN or CP-NN), which flagged CP-09 - a procedure code that lives
+    in claims-adjuster-authority.md, a filename with no "CP-09" in it - as a
+    missing retrieval. CP codes are not endorsements and must not be checked.
+    """
+
+    case = {
+        "type": "summary",
+        "notes": "The adjuster wants to know what CP-09 requires before issuing the denial letter.",
+    }
+    result = _summary_result(
+        "COVERAGE: denied\n",
+        retrieved=[{"source": "claims-adjuster-authority.md", "chunk_id": "c1"}],
+    )
+
+    checked = eval_assertions.named_endorsement_retrieved(case, result)
+
+    assert checked["status"] == "skip"
+
+
+def test_a9_skips_when_no_endorsement_is_named_or_case_is_not_a_summary():
+
+    no_code = eval_assertions.named_endorsement_retrieved(
+        {"type": "summary", "notes": "General coverage question, no endorsement named."},
+        _summary_result("COVERAGE: covered\n"),
+    )
+    assert no_code["status"] == "skip"
+
+    not_a_summary = eval_assertions.named_endorsement_retrieved(
+        {"type": "chat", "notes": "Endorsement HO-2026-01 is attached."},
+        _summary_result("COVERAGE: covered\n"),
+    )
+    assert not_a_summary["status"] == "skip"
+
+
 # -------------------------------------------------------------------- A5-A8
 
 def test_a5_regression_check_fails_only_when_an_answerable_question_is_refused():

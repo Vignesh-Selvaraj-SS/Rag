@@ -36,7 +36,12 @@ NAME = r"[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+"
 # words survive. Shape-only matching would redact headings like "Water Backup"
 # out of the retrieved chunk text.
 REDACTIONS = [
-    (re.compile(r"\bCLM[- ]?\d{4,}\b", re.IGNORECASE), "[CLAIM_NO]"),
+    # Week 11: a real leak found while building claim_log_service.py - this
+    # only matched the FIRST digit group of a real "CLM-2026-09001" claim
+    # number, so the old pattern turned it into "[CLAIM_NO]-09001", leaking
+    # the last 5 digits. Extended to consume any further hyphen/space
+    # separated digit groups too.
+    (re.compile(r"\bCLM[- ]?\d{4,}(?:[- ]\d{4,})*\b", re.IGNORECASE), "[CLAIM_NO]"),
     (re.compile(r"\bHO[- ]?\d{7,}\b", re.IGNORECASE), "[POLICY_NO]"),
     (re.compile(r"\bclaim(?:ant)?\s+(?:number\s+)?#?\s*\d{4,}\b", re.IGNORECASE), "[CLAIM_NO]"),
     # "claimant Maria Delgado", "policyholder Robert Chen", "insured Priya Raghavan".

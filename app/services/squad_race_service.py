@@ -53,7 +53,8 @@ def p99(values: list[float]) -> float:
 def run_single_agent_case(case: dict, summary_service, judge_service) -> dict:
 
     outcome = _call_with_retry(
-        summary_service.summarise, case["notes"], mode=case.get("retrieval_mode", "hybrid")
+        summary_service.summarise, case["notes"],
+        mode=case.get("retrieval_mode", "hybrid"), source=case.get("source"),
     )
     outcome["answer"] = outcome["summary"]  # trace_checks.py's shared assertions read "answer"
     checks = eval_assertions.run_assertions(case, outcome)

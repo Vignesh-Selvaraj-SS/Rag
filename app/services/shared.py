@@ -14,6 +14,7 @@ from app.services.document_service import DocumentService
 from app.services.eval_service import EvalService
 from app.services.evaluation_service import EvaluationService
 from app.services.agent_service import ClaimAgent
+from app.services.claim_log_service import ClaimLogService
 from app.services.claims_squad_service import ClaimsSquadService
 from app.services.fixed_claim_workflow import FixedClaimWorkflow
 from app.services.index_metadata import IndexMetadata
@@ -59,6 +60,11 @@ def get_evaluation_service() -> EvaluationService:
 @lru_cache(maxsize=1)
 def get_summary_service() -> SummaryService:
     return SummaryService(rag_service=get_rag_service())
+
+
+@lru_cache(maxsize=1)
+def get_claim_log_service() -> ClaimLogService:
+    return ClaimLogService(path=settings.claim_log_path, enabled=settings.RECORD_TRACES)
 
 
 @lru_cache(maxsize=1)

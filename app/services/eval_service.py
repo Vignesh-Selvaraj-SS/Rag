@@ -156,7 +156,8 @@ class EvalService:
                 if summary_service is None:
                     raise BadRequestError("Summary cases need a summary service.")
                 outcome = _call_with_retry(
-                    summary_service.summarise, case["notes"], mode=case.get("retrieval_mode", "hybrid")
+                    summary_service.summarise, case["notes"],
+                    mode=case.get("retrieval_mode", "hybrid"), source=case.get("source"),
                 )
                 outcome["answer"] = outcome["summary"]
             else:

@@ -120,6 +120,11 @@ class Settings(BaseSettings):
         return self.RUNTIME_DIR / "traces.jsonl"
 
     @property
+    def claim_log_path(self) -> Path:
+        """Week 11: per-request log for claim-summary runs (app/services/claim_log_service.py)."""
+        return self.RUNTIME_DIR / "claim_log.jsonl"
+
+    @property
     def index_metadata_path(self) -> Path:
         return Path(self.QDRANT_PATH) / "index_meta.json"
 

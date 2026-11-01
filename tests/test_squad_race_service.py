@@ -30,7 +30,7 @@ class _FakeSummaryService:
         self.delay = delay
         self.calls: list[str] = []
 
-    def summarise(self, notes, mode="hybrid"):
+    def summarise(self, notes, mode="hybrid", source=None):
         self.calls.append(notes)
         if self.delay:
             time.sleep(self.delay)
