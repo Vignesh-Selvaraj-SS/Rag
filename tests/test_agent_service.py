@@ -256,7 +256,9 @@ def test_search_policy_schema_does_not_invite_settlement_authority_checks():
     # Week 9: this description now lives on the MCP server's tool function
     # (mcp_servers/claims_system_server.py), not a hand-written schema dict -
     # FastMCP derives what the model sees straight from this docstring.
-    description = (search_policy_mcp_tool.description or "").lower()
+    # The decorated function is a plain function with a docstring in this
+    # fastmcp version, not a Tool wrapper object exposing `.description`.
+    description = (search_policy_mcp_tool.__doc__ or "").lower()
 
     assert "settlement authority" not in description or "never use this to check" in description
     assert "check_settlement_authority" in description

@@ -11,7 +11,16 @@ rank-bm25>=0.2,<1
 python-multipart>=0.0.20,<1
 
 # Week 9: MCP server (claims-system tools) + MCP client (ClaimAgent's tool discovery)
-fastmcp>=2.14,<3
+# Pinned to an exact version, not a range: every 2.14.x release (what >=2.14,<3
+# used to resolve to) needs mcp<2.0 by its own declared metadata, but its code
+# actually imports names that only exist in mcp>=2.0 (and separately, every
+# available mcp>=2.0 release renamed McpError to MCPError, which 2.14.x's code
+# still expects by the old name) - that whole line genuinely cannot import with
+# any mcp version on PyPI today. 3.2.0 is the version actually verified working
+# here (fastmcp.Client importable, full app + test suite green); 3.4.0+ moved
+# `Client` out of the top-level package, so this needs a real code check before
+# ever bumping it again, not just a wider range.
+fastmcp==3.2.0
 httpx>=0.27,<1
 
 # PDF handling: text + tables + embedded/scanned-page OCR
